@@ -130,6 +130,58 @@ class PriorTests(unittest.TestCase):
         # should raise an assertionerror.
         self.assertRaises(AssertionError, m.rbf.set_prior, gaussian)
 
+    def test_chisquared(self):
+        # pass
+        xmin, xmax =1, 2.5*np.pi
+        b, C, SNR =1, 0, 0.1
+        X = np.linspace(xmin, xmax, 500)
+        y = b*X + C + 1*np.sin(X)
+        y += 0.05*np.random.randn(len(X))
+        X, y = X[:, np.newaxis], y[:, np.newaxis]
+        m = GPy.models.SparseGPRegression(X, y)
+        Chisquared = GPy.priors.Chisquared(1,1,1)
+        m.Z.set_prior(Chisquared)
+        # m.randomize()
+
+        # self.assertRaises(AssertionError, m.rbf.set_prior, Chisquared)
+        # The gradients need to be checked
+        self.assertTrue(m.checkgrad())
+
+        # Check the singleton pattern:
+        self.assertIs(Chisquared, GPy.priors.Chisquared(1, 1, 1))
+        # self.assertIsNot(Chisquared, GPy.priors.Chisquared(2, 2, 4))
+
+    def test_scaled_inv_chisquared(self):
+        xmin, xmax = 1, 2.5*np.pi
+        b, C, SNR = 1, 0, 0.1
+        X = np.linspace(xmin, xmax, 500)
+        y  = b*X + C + 1*np.sin(X)
+        y += 0.05*np.random.randn(len(X))
+        X, y = X[:, None], y[:, None]
+        m = GPy.models.SparseGPRegression(X, y)
+        invChiSquared = GPy.priors.ScaledInvChisquared(0, 1, 1)
+        m.Z.set_prior(invChiSquared)
+
+        # The gradients need to be checked
+        self.assertTrue(m.checkgrad())
+
+
+    def test_laplace(self):
+        xmin, xmax = 1, 2.5*np.pi
+        b, C, SNR = 1, 0, 0.1
+        X = np.linspace(xmin, xmax, 500)
+        y  = b*X + C + 1*np.sin(X)
+        y += 0.05*np.random.randn(len(X))
+        X, y = X[:, None], y[:, None]
+        m = GPy.models.SparseGPRegression(X, y)
+        laplace = GPy.priors.Laplace(0, 1)
+        # m.rbf.set_prior(laplace)
+        m.randomize()
+        self.assertRaises(AssertionError, m.rbf.set_prior, laplace)
+        self.assertTrue(m.checkgrad())
+
+
+
 if __name__ == "__main__":
     print("Running unit tests, please be (very) patient...")
     unittest.main()

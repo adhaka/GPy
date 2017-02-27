@@ -1310,6 +1310,7 @@ class Exponential(Prior):
     def rvs(self, n):
         return np.random.exponential(scale=self.l, size=n)
 
+
 class StudentT(Prior):
     """
     Implementation of the student t probability function, coupled with random variables.
@@ -1358,3 +1359,185 @@ class StudentT(Prior):
         from scipy.stats import t
         ret = t.rvs(self.nu, loc=self.mu, scale=self.sigma, size=n)
         return ret    
+
+
+class Chisquared(Prior):
+    """
+    Implementation of chi-squared distribution !!
+
+    :param mu: mean
+    :param sigma: standard deviation
+    :param nu: degrees of freedom
+
+    .. Note:: Bishop 2006 notation is used throughout the code
+
+    """
+    domain = _POSITIVE
+    _instances = []
+
+    def __new__(cls, mu=0, sigma=1, nu=1):
+        if cls._instances:
+            cls._instances[:] = [instance for instance in cls._instances if instance()]
+            for instance in cls._instances:
+                if instance().mu == mu and instance().sigma == sigma and instance().nu == nu:
+                    return instance()
+        newfunc = super(Prior, cls).__new__
+        if newfunc is object.__new__:
+            o = newfunc(cls)
+        else:
+            o = newfunc(cls, mu, sigma, nu)
+        cls._instances.append(weakref.ref(o))
+        return cls._instances[-1]()
+
+    def __init__(self, mu, sigma, nu):
+        self.mu = float(mu)
+        self.sigma = float(sigma)
+        self.sigma2 = np.square(sigma)
+        self.nu = float(nu)
+
+    def __str__(self):
+        return "Chi({:.2g}, {:,.2g}, {:,.2g})".format(self.mu, self.sigma, self.nu)
+
+    def summary(self):
+        ret = {"E[x]": self.nu,
+               "E[ln x]": np.log(self.nu),
+               "var[x]": 2*self.nu,
+               "Entropy": 0}
+        return ret
+
+    def lnpdf(self, x):
+        from scipy.stats import chi2
+        return chi2.logpdf(x,self.nu,self.mu,self.sigma)
+
+    def lnpdf_grad(self, x):
+        return (self.nu / 2. - 1.)/(x - self.mu) - 0.5
+
+    def rvs(self, n):
+        from scipy.stats import chi2
+        ret = chi2.rvs(self.nu, loc=self.mu, scale=self.sigma, size=n)
+        return ret
+
+
+class ScaledInvChisquared(Prior):
+    """
+    Implementation of scaled inverse chi-squared distribution !!
+
+    convention used from Gelman, Vehtari: Bayesian Data Analysis 2013.
+
+    :param mu: mean
+    :param sigma: standard deviation
+    :param nu: degrees of freedom
+
+    """
+    domain = _POSITIVE
+    _instances = []
+
+    def __new__(cls, mu=0, sigma=1, nu=1):
+        if cls._instances:
+            cls._instances[:] = [instance for instance in cls._instances if instance()]
+            for instance in cls._instances:
+                if instance().mu == mu and instance().sigma == sigma and instance().nu == nu:
+                    return instance()
+        newfunc = super(Prior, cls).__new__
+        if newfunc is object.__new__:
+            o = newfunc(cls)
+        else:
+            o = newfunc(cls, mu, sigma, nu)
+        cls._instances.append(weakref.ref(o))
+        return cls._instances[-1]()
+
+    def __init__(self, mu, sigma, nu):
+        self.mu = float(mu)
+        self.sigma = float(sigma)
+        self.sigma2 = np.square(sigma)
+        self.nu = float(nu)
+
+    def __str__(self):
+        return "Sinvchi2({:.2g}, {:,.2g}, {:,.2g})".format(self.mu, self.sigma, self.nu)
+
+    def summary(self):
+        raise NotImplementedError
+        # ret = {"E[x]":self.mu}
+
+    def lnpdf(self, x):
+
+        # ret = (self.nu / 2) * np.log(self.nu / 2) - gammaln(self.nu / 2.) + self.nu*np.log(self.sigma) \
+        #       -(self.nu/2 + 1)*np.log(x) - self.nu*self.sigma2/(2*x)
+        ret = self.nu * np.log(self.sigma2 * self.nu / 2. ) / 2. - np.log(x)*(1 + self.nu/2) \
+              - self.nu*self.sigma2/ (2*x)  - gammaln(self.nu / 2.)
+        return ret
+
+    def lnpdf_grad(self, x):
+        return -(self.nu/2+1)/x + self.nu*self.sigma2 /(2*np.square(x));
+        # return  -(self.nu/2 + 1)/x  + self.nu*self.sigma2 / (2*x**2)
+
+    def rvs(self, n):
+        raise NotImplementedError
+        # return np.random.rand(n)   # WRONG IMPLEMENTATION ofcourse  !!
+
+
+class LogGamma(Prior):
+    """
+    loggamma uniform prior!!
+    :param mu: mean
+    :param scale:scale parameter
+
+    """
+    domain = _POSITIVE
+    _instances = []
+
+    def __new__(cls, lower=0, upper=1):  # Singleton:
+        if cls._instances:
+            cls._instances[:] = [instance for instance in cls._instances if instance()]
+            for instance in cls._instances:
+                if instance().lower == lower and instance().upper == upper:
+                    return instance()
+        o = super(Prior, cls).__new__(cls, lower, upper)
+        cls._instances.append(weakref.ref(o))
+        return cls._instances[-1]()
+
+    def __init__(self, lower=0, upper=1):
+        pass
+
+
+class Laplace(Prior):
+    """
+    Laplace prior implementation!!
+    :param mu: mean
+    :param scale:scale parameter
+
+    """
+    domain = _REAL
+    _instances = []
+
+
+    def __new__(cls, mu=0, scale=1):  # Singleton:
+        if cls._instances:
+            cls._instances[:] = [instance for instance in cls._instances if instance()]
+            for instance in cls._instances:
+                if instance().mu == mu and instance().scale == scale:
+                    return instance()
+        newfunc = super(Prior, cls).__new__
+        if newfunc is object.__new__:
+            o = newfunc(cls)
+        else:
+            o = newfunc(cls, mu, scale)
+        cls._instances.append(weakref.ref(o))
+        return cls._instances[-1]()
+
+    def __init__(self, mu=0, scale=1):
+        self.mu = float(mu)
+        self.scale = float(scale)
+
+    def lnpdf(self, x):
+        from scipy.stats import laplace
+        lnpdf = laplace.logpdf(x, self.mu, self.scale)
+        return lnpdf
+
+    def lnpdf_grad(self, x):
+        grad =  -np.sign(x - self.mu) / self.scale
+        return grad
+
+    def rvs(self, n):
+        from scipy import stats
+        return stats.laplace.rvs(loc=self.mu, scale=self.scale, size=n)
