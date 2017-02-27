@@ -123,6 +123,11 @@ class TestNoiseModels(object):
         
         self.var = 0.2
         self.deg_free = 4.0
+        censored = np.zeros_like(self.Y)
+        random_inds = np.random.choice(self.N, int(self.N/2), replace=True)
+        censored[random_inds] = 1
+        self.Y_metadata = dict()
+        self.Y_metadata['censored'] = censored
 
         #Make a bigger step as lower bound can be quite curved
         self.step = 1e-4
@@ -275,12 +280,52 @@ class TestNoiseModels(object):
                 "laplace": True,
             },
             #,
-            #GAMMA needs some work!"Gamma_default": {
-            #"model": GPy.likelihoods.Gamma(),
-            #"link_f_constraints": [constrain_positive],
-            #"Y": self.positive_Y,
-            #"laplace": True
-            #}
+            #GAMMA needs some work!
+            # "Gamma_default": {
+            # "model": GPy.likelihoods.Gamma(),
+            # "link_f_constraints": [self.constrain_positive],
+            # "Y": self.positive_Y,
+            # "laplace": True
+            # },
+            "Weibull_default": {
+            "model": GPy.likelihoods.WeibullCen(),
+            "link_f_constraints": [self.constrain_positive],
+            "Y": self.positive_Y,
+            "laplace": True
+            },
+            "loglogistic_default": {
+                "model": GPy.likelihoods.LogLogistic(),
+                "link_f_constraints": [self.constrain_positive],
+                "Y": self.positive_Y,
+                "laplace": True
+            },
+            "loglogistic_censored": {
+                "model": GPy.likelihoods.LogLogistic(),
+                "link_f_constraints": [self.constrain_positive],
+                "Y": self.positive_Y,
+                "Y_metadata": self.Y_metadata,
+                "laplace": True
+            },
+            "weibull_censored":{
+                "model":GPy.likelihoods.WeibullCen(),
+                "link_f_constraints": [self.constrain_positive],
+                "Y": self.positive_Y,
+                "Y_metadata": self.Y_metadata,
+                "laplace": True
+            },
+            "loggaussian":{
+                "model":GPy.likelihoods.LogGaussian(),
+                "link_f_constraints": [self.constrain_positive],
+                "Y": self.positive_Y,
+                "laplace":True
+            },
+            "loggaussian_censored":{
+                "model":GPy.likelihoods.LogGaussian(),
+                "link_f_constraints": [self.constrain_positive],
+                "Y": self.positive_Y,
+                "Y_metadata": self.Y_metadata,
+                "laplace": True
+            }
         }
 
 
