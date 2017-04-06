@@ -548,6 +548,17 @@ class MiscTests(unittest.TestCase):
         np.testing.assert_allclose(np.diag(wv), 0, atol=1e-4)
         np.testing.assert_allclose(np.sort(m.kern.slope.flat), np.sort(true_slope), rtol=1e-4)
 
+    def test_LOO_laplace(self):
+        import GPy
+        gauss = GPy.likelihoods.Gaussian()
+        kern = GPy.kern.RBF(self.X.shape[1]) + GPy.kern.White(self.X.shape[1])
+        exact = GPy.inference.latent_function_inference.ExactGaussianInference()
+        m_exact = GPy.core.GP(X=self.X, Y=self.Y, kernel=kern.copy(), likelihood=gauss.copy(), inference_method=exact)
+        laplace = GPy.inference.latent_function_inference.Laplace()
+        m_laplace = GPy.core.GP(X=self.X, Y=self.Y, kernel=kern.copy(), likelihood=gauss.copy(), inference_method=laplace)
+        m_laplace[:] = m_exact[:]
+        np.testing.assert_almost_equal(m_exact.LOO(), m_laplace.LOO())
+
 class GradientTests(np.testing.TestCase):
     def setUp(self):
         ######################################
