@@ -8,7 +8,6 @@ from .likelihood import Likelihood
 from .mixed_noise import MixedNoise
 from .binomial import Binomial
 from .weibull import Weibull
-from .weibull1 import WeibullCen
 from .loglogistic import LogLogistic
 from .logGaussian import LogGaussian
 

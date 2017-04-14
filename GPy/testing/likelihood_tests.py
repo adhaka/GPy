@@ -288,7 +288,7 @@ class TestNoiseModels(object):
             # "laplace": True
             # },
             "Weibull_default": {
-            "model": GPy.likelihoods.WeibullCen(),
+            "model": GPy.likelihoods.Weibull(),
             "link_f_constraints": [self.constrain_positive],
             "Y": self.positive_Y,
             "laplace": True
@@ -307,7 +307,7 @@ class TestNoiseModels(object):
                 "laplace": True
             },
             "weibull_censored":{
-                "model":GPy.likelihoods.WeibullCen(),
+                "model":GPy.likelihoods.Weibull(),
                 "link_f_constraints": [self.constrain_positive],
                 "Y": self.positive_Y,
                 "Y_metadata": self.Y_metadata,
