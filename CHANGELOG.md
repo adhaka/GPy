@@ -1,8 +1,65 @@
 # Changelog
 
-## v1.5.7 (2017-01-09)
+## v1.6.1 (2017-02-28)
 
 ### Fix
+
+* Beiwang will add GMM in full. [mzwiessele]
+
+### Other
+
+* Bump version: 1.6.0 → 1.6.1. [mzwiessele]
+
+
+## v1.6.0 (2017-02-28)
+
+### Fix
+
+* Kernel tests and variational tests. [mzwiessele]
+
+* Plotting tests for new matplotlib. [mzwiessele]
+
+* Model tests numpy integer error. [mzwiessele]
+
+* Replot with new matplotlib. [mzwiessele]
+
+* Offline plotting workaround with squeezing arrays. [mzwiessele]
+
+* Fixed numpy 1.12 indexing and shape preservation. [mzwiessele]
+
+### Other
+
+* Bump version: 1.5.9 → 1.6.0. [mzwiessele]
+
+* Merge branch &#x27;devel&#x27; into alexfeld-offline_plotly. [mzwiessele]
+
+* Merge branch &#x27;devel&#x27; into alexfeld-offline_plotly. [mzwiessele]
+
+* Merge branch &#x27;offline_plotly&#x27; of git://github.com/alexfeld/GPy into alexfeld-offline_plotly. [mzwiessele]
+
+* Provide two classes for plotly plots to remove global variable. [Alex Feldstein]
+
+* Add offline plotting for plotly. [Alex Feldstein]
+
+
+## v1.5.9 (2017-02-23)
+
+### Other
+
+* Bump version: 1.5.8 → 1.5.9. [mzwiessele]
+
+* Merge remote-tracking branch &#x27;origin/deploy&#x27; into devel. [mzwiessele]
+
+* Merge pull request #455 from SheffieldML/devel. [Max Zwiessele]
+
+  1.5.6
+
+
+## v1.5.8 (2017-02-23)
+
+### Fix
+
+* Predictive_gradients for new posterior class. [mzwiessele]
 
 * Removed additional dict line. [mzwiessele]
 
@@ -17,6 +74,20 @@
   * fix: remove extra statement
 
 ### Other
+
+* Bump version: 1.5.7 → 1.5.8. [mzwiessele]
+
+* Update ss_gplvm.py. [Zhenwen Dai]
+
+  resolve the future warning: FutureWarning:comparison to `None` will result in an elementwise object comparison in the future.
+
+* Merge pull request #472 from SheffieldML/predictive_gradients. [Max Zwiessele]
+
+  fix: predictive_gradients for new posterior class
+
+* Merge pull request #470 from SheffieldML/plotting_fix. [Max Zwiessele]
+
+  Plotting fix
 
 * Bump version: 1.5.6 → 1.5.7. [mzwiessele]
 
