@@ -79,7 +79,7 @@ class EP(EPBase, ExactGaussianInference):
             raise ValueError("ep_mode value not valid")
 
         v_tilde = mu_tilde * tau_tilde
-        return self._inference(K, tau_tilde, v_tilde, likelihood, Y_metadata=Y_metadata,  Z_tilde=log_Z_tilde.sum())
+        return self._inference(Y, K, tau_tilde, v_tilde, likelihood, Y_metadata=Y_metadata,  Z_tilde=log_Z_tilde.sum())
 
     def expectation_propagation(self, K, Y, likelihood, Y_metadata):
 
@@ -203,7 +203,7 @@ class EP(EPBase, ExactGaussianInference):
 
         return log_marginal, mu, Sigma, L
 
-    def _inference(self, K, tau_tilde, v_tilde, likelihood, Z_tilde, Y_metadata=None):
+    def _inference(self, Y, K, tau_tilde, v_tilde, likelihood, Z_tilde, Y_metadata=None):
         log_marginal, mu, Sigma, L = self._ep_marginal(K, tau_tilde, v_tilde, Z_tilde)
 
         tau_tilde_root = np.sqrt(tau_tilde)
@@ -216,7 +216,8 @@ class EP(EPBase, ExactGaussianInference):
         symmetrify(Wi) #(K + Sigma^(\tilde))^(-1)
 
         dL_dK = 0.5 * (tdot(alpha) - Wi)
-        dL_dthetaL = likelihood.exact_inference_gradients(np.diag(dL_dK), Y_metadata)
+        # dL_dthetaL = likelihood.exact_inference_gradients(np.diag(dL_dK), Y_metadata)
+        dL_dthetaL = likelihood.ep_gradients(Y, tau_tilde, v_tilde, Y_metadata=Y_metadata)
 
         return Posterior(woodbury_inv=Wi, woodbury_vector=alpha, K=K), log_marginal, {'dL_dK':dL_dK, 'dL_dthetaL':dL_dthetaL, 'dL_dm':alpha}
 
@@ -328,6 +329,7 @@ class EPDTC(EPBase, VarDTC):
                 #Marginal moments
                 Z_hat[i], mu_hat[i], sigma2_hat[i] = likelihood.moments_match_ep(Y[i], tau_cav[i], v_cav[i], Y_metadata_i=Y_metadata_i)
                 #Site parameters update
+                # fractional ep-update
                 delta_tau = self.delta/self.eta*(1./sigma2_hat[i] - 1./Sigma_diag[i])
                 delta_v = self.delta/self.eta*(mu_hat[i]/sigma2_hat[i] - mu[i]/Sigma_diag[i])
                 tau_tilde_prev = tau_tilde[i]
@@ -335,7 +337,7 @@ class EPDTC(EPBase, VarDTC):
 
                 # Enforce positivity of tau_tilde. Even though this is guaranteed for logconcave sites, it is still possible
                 # to get negative values due to numerical errors. Moreover, the value of tau_tilde should be positive in order to
-                # update the marginal likelihood without inestability issues.
+                # update the marginal likelihood without instability issues.
                 if tau_tilde[i] < np.finfo(float).eps:
                     tau_tilde[i] = np.finfo(float).eps
                     delta_tau = tau_tilde[i] - tau_tilde_prev
