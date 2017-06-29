@@ -260,9 +260,12 @@ class Likelihood(Parameterized):
 
         # X = gh_x[None,:]*np.sqrt(2.*v[:,None]) + m[:,None]
         X = gh_x[:,None]
-
+        Y_metadata = {}
+        if Y_metadata_i is not None:
+            for key in Y_metadata_i.keys():
+                Y_metadata[key] = Y_metadata_i[key]*np.ones(X.shape)
         #logp = self.logpdf(X, obs, Y_metadata=Y_metadata_i)
-        dlogp_dtheta = self.dlogpdf_dtheta(X, obs, Y_metadata=Y_metadata_i)
+        dlogp_dtheta = self.dlogpdf_dtheta(X, obs*np.ones(X.shape), Y_metadata=Y_metadata_i)
 
         #F = np.dot(logp.flatten(), gh_w.flatten())/np.sqrt(np.pi)
         dF_dtheta_i = np.dot(dlogp_dtheta.reshape((self.size,-1)), gh_w)/np.sqrt(np.pi)
