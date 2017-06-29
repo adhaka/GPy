@@ -259,13 +259,13 @@ class Likelihood(Parameterized):
             gh_x, gh_w = gh_points
 
         # X = gh_x[None,:]*np.sqrt(2.*v[:,None]) + m[:,None]
-        X = gh_x[None,:]
+        X = gh_x[:,None]
 
-        logp = self.logpdf(X, obs, Y_metadata=Y_metadata_i)
+        #logp = self.logpdf(X, obs, Y_metadata=Y_metadata_i)
         dlogp_dtheta = self.dlogpdf_dtheta(X, obs, Y_metadata=Y_metadata_i)
 
-        F = np.dot(logp, gh_w)/np.sqrt(np.pi)
-        dF_dtheta_i = np.dot(dlogp_dtheta, gh_w)/np.sqrt(np.pi)
+        #F = np.dot(logp.flatten(), gh_w.flatten())/np.sqrt(np.pi)
+        dF_dtheta_i = np.dot(dlogp_dtheta.reshape((self.size,-1)), gh_w)/np.sqrt(np.pi)
         return dF_dtheta_i
 
     def variational_expectations(self, Y, m, v, gh_points=None, Y_metadata=None):
