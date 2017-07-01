@@ -259,7 +259,7 @@ class Likelihood(Parameterized):
             gh_x, gh_w = gh_points
 
         # X = gh_x[None,:]*np.sqrt(2.*v[:,None]) + m[:,None]
-        X = gh_x[:,None]*np.sqrt(2*sigma2[:,None]) + m[:,None]
+        X = gh_x[:,None]*np.sqrt(2*sigma2) + mu
         Y_metadata = {}
         if Y_metadata_i is not None:
             for key in Y_metadata_i.keys():
