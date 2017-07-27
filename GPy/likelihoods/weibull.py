@@ -19,8 +19,10 @@ class Weibull(Likelihood):
 
     def __init__(self, gp_link=None, beta=1.):
         if gp_link is None:
-            # gp_link = link_functions.Log()
-            gp_link = link_functions.Identity()
+            #Parameterised not as link_f but as f
+            # gp_link = link_functions.Identity()
+            #Parameterised as link_f
+            gp_link = link_functions.Log()
         super(Weibull, self).__init__(gp_link, name='Weibull')
 
         self.r = Param('r_weibull_shape', float(beta), Logexp())
@@ -71,9 +73,11 @@ class Weibull(Likelihood):
         if Y_metadata is not None and 'censored' in Y_metadata.keys():
             c = Y_metadata['censored']
 
-        # log_objective = np.log(self.r) + (self.r - 1) * np.log(y) - link_f - (np.exp(-link_f) * (y ** self.r))
-        uncensored = (1-c)* (np.log(self.r) + (self.r - 1) * np.log(y) - link_f - (np.exp(-link_f) * (y ** self.r)))
-        censored = (-c)*np.exp(-link_f)*(y**self.r)
+        # uncensored = (1-c)* (np.log(self.r) + (self.r - 1) * np.log(y) - link_f - (np.exp(-link_f) * (y ** self.r)))
+        # censored = (-c)*np.exp(-link_f)*(y**self.r)
+        uncensored = (1-c)*( np.log(self.r)-np.log(link_f)+(self.r-1)*np.log(y) - y**self.r/link_f)
+        censored = -c*y**self.r/link_f
+
         log_objective = uncensored + censored
         return log_objective
 
@@ -99,10 +103,11 @@ class Weibull(Likelihood):
         if Y_metadata is not None and 'censored' in Y_metadata.keys():
             c = Y_metadata['censored']
 
-        uncensored = (1-c)* ( -1 + np.exp(-link_f)*(y ** self.r))
-        censored = c*np.exp(-link_f)*(y**self.r)
+        # uncensored = (1-c)* ( -1 + np.exp(-link_f)*(y ** self.r))
+        # censored = c*np.exp(-link_f)*(y**self.r)
+        uncensored = (1-c)*(-1/link_f + y**self.r/link_f**2)
+        censored = c*y**self.r/link_f**2
         grad = uncensored + censored
-        # grad = -1 + np.exp(-link_f) * (y ** self.r)
         return grad
 
     def d2logpdf_dlink2(self, link_f, y, Y_metadata=None):
@@ -132,8 +137,10 @@ class Weibull(Likelihood):
         if Y_metadata is not None and 'censored' in Y_metadata.keys():
             c = Y_metadata['censored']
 
-        uncensored = (1-c)* (-(y ** self.r) * np.exp(-link_f))
-        censored = -c*np.exp(-link_f)*y**self.r
+        # uncensored = (1-c)* (-(y ** self.r) * np.exp(-link_f))
+        # censored = -c*np.exp(-link_f)*y**self.r
+        uncensored = (1-c)*(1/link_f**2 -2*y**self.r/link_f**3)
+        censored = -c*2*y**self.r/link_f**3
         hess = uncensored + censored
         # hess = -(y ** self.r) * np.exp(-link_f)
         return hess
@@ -159,8 +166,10 @@ class Weibull(Likelihood):
         c = np.zeros_like(y)
         if Y_metadata is not None and 'censored' in Y_metadata.keys():
             c = Y_metadata['censored']
-        uncensored = (1-c)* ((y ** self.r) * np.exp(-link_f))
-        censored = c*np.exp(-link_f)*y**self.r
+        # uncensored = (1-c)* ((y ** self.r) * np.exp(-link_f))
+        # censored = c*np.exp(-link_f)*y**self.r
+        uncensored = (1-c)*(-2/link_f**3+ 6*y**self.r/link_f**4)
+        censored = c*6*y**self.r/link_f**4
 
         d3lik_dlink3 = uncensored + censored
         # d3lik_dlink3 = (y ** self.r) * np.exp(-link_f)
@@ -188,13 +197,12 @@ class Weibull(Likelihood):
         link_f = inv_link_f
         if Y_metadata is not None and 'censored' in Y_metadata.keys():
             c = Y_metadata['censored']
-        # dlogpdf_dr = 1. / self.r + np.log(y) - np.exp(-inv_link_f) * (y ** self.r) * np.log(y)
-        uncensored = (1-c)* (1./self.r + np.log(y) - np.exp(-inv_link_f)*(y**self.r)*np.log(y))
-        censored = (-c)*np.exp(-link_f)*(y**self.r)*np.log(y)
+        uncensored = (1-c)* (1./self.r + np.log(y) - y**self.r*np.log(y)/link_f)
+        censored = (-c*y**self.r*np.log(y)/link_f)
         dlogpdf_dr = uncensored + censored
         return dlogpdf_dr
 
-    def dlogpdf_dlink_dr(self, link_f, y, Y_metadata=None):
+    def dlogpdf_dlink_dr(self, inv_link_f, y, Y_metadata=None):
         """
         First order derivative derivative of loglikelihood wrt r:shape parameter
 
@@ -212,8 +220,11 @@ class Weibull(Likelihood):
         if Y_metadata is not None and 'censored' in Y_metadata.keys():
             c = Y_metadata['censored']
 
-        uncensored = (1-c)*(np.exp(-link_f)* (y ** self.r) * np.log(y))
-        censored = c*np.exp(-link_f)*(y**self.r)*np.log(y)
+        link_f = inv_link_f
+        # uncensored = (1-c)*(np.exp(-link_f)* (y ** self.r) * np.log(y))
+        # censored = c*np.exp(-link_f)*(y**self.r)*np.log(y)
+        uncensored = (1-c)*(y**self.r*np.log(y)/link_f**2)
+        censored = c*(y**self.r*np.log(y)/link_f**2)
         dlogpdf_dlink_dr = uncensored + censored
         return dlogpdf_dlink_dr
 
@@ -231,10 +242,11 @@ class Weibull(Likelihood):
         if Y_metadata is not None and 'censored' in Y_metadata.keys():
             c = Y_metadata['censored']
 
-        uncensored = (1-c)*( -np.exp(-link_f)* (y ** self.r) * np.log(y))
-        censored = -c*np.exp(-link_f)*(y**self.r)*np.log(y)
+        # uncensored = (1-c)*( -np.exp(-link_f)* (y ** self.r) * np.log(y))
+        # censored = -c*np.exp(-link_f)*(y**self.r)*np.log(y)
+        uncensored = (1-c)*-2*y**self.r*np.log(y)/link_f**3
+        censored = c*-2*y**self.r*np.log(y)/link_f**3
         d2logpdf_dlink_dr = uncensored + censored
-        # d2logpdf_dlink_dr = -np.exp(-link_f) * (y ** self.r) * np.log(y)
 
         return d2logpdf_dlink_dr
 
@@ -253,7 +265,6 @@ class Weibull(Likelihood):
         uncensored = (1-c)* ((y**self.r)*np.exp(-link_f)*np.log1p(y))
         censored = c*np.exp(-link_f)*(y**self.r)*np.log(y)
         d3logpdf_dlink3_dr = uncensored + censored
-        # d3logpdf_dlink_dr = np.exp(-link_f) * (y ** self.r) * np.log(y)
         return d3logpdf_dlink3_dr
 
     def dlogpdf_link_dtheta(self, f, y, Y_metadata=None):
