@@ -7,6 +7,7 @@ from . import parameterization
 
 from .gp import GP
 from .svgp import SVGP
+from .tvbgp import TVB
 from .sparse_gp import SparseGP
 from .gp_grid import GpGrid
 from .mapping import *

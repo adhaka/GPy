@@ -4,8 +4,9 @@ import numpy as np
 from ...util.linalg import jitchol, DSYR, dtrtrs, dtrtri, pdinv, dpotrs, tdot, symmetrify
 from paramz import ObsAr
 from . import ExactGaussianInference, VarDTC
-from ...util import diag
+from ...util import diag, quad_integrate
 from .posterior import PosteriorEP as Posterior
+from functools import partial
 
 log_2_pi = np.log(2*np.pi)
 
@@ -17,6 +18,55 @@ class marginalMoments(object):
         self.mu_hat = np.empty(num_data,dtype=np.float64)
         self.sigma2_hat = np.empty(num_data,dtype=np.float64)
 
+class QuadTilted(marginalMoments):
+    def __init__(self, Y, lik):
+        self.num_data = len(Y.flatten())
+        super(QuadTilted, self).__init__(self.num_data)
+        self.Y = Y
+        self.lik = lik
+        # number of free parameters is equal to the number of unconstrained params of likelihood ...
+        self.num_params = self.lik.size
+
+    def set_cavity(self, mu, sigma2):
+        self.cavity_means = mu
+        self.cavity_sigma2 = sigma2
+        self.cavity_sigma = np.sqrt(sigma2)
+
+    def compute_moments(self, mu, sigma2):
+        self.set_cavity(mu, sigma2)
+        if self.lik.size:
+            f = partial(quad_integrate.integrate, lik=self.lik, get_derivs=True)
+        else:
+            f = partial(quad_integrate.integrate, lik=self.lik)
+
+        quads, numevals = zip(*map(f, self.Y, self.cavity_means, self.cavity_sigma))
+        quads = np.vstack(quads)
+
+        self.Z_hat = quads[:,0]
+        self.mu_hat = quads[:,1] /self.Z_hat
+        self.moment2 = quads[:,2]/self.Z_hat
+        self.moment3 = quads[:,3]/self.Z_hat
+        self.moment4 = quads[:,4]/self.Z_hat
+        self.dZ_dtheta =quads[:,5::3].T
+        # variance = E[X**2] - (E[X])**2
+        self.sigma2_hat = self.moment2 - np.square(self.mu_hat)
+
+        self.dmu_hat_dtheta = quads[:,6::3].T/self.Z_hat - self.dZ_dtheta*self.mu_hat/self.Z_hat
+        self.dmoment2_dtheta = quads[:,7::3].T/self.Z_hat - self.dZ_dtheta*self.moment2/self.Z_hat
+        self.dsigma2_dtheta = self.dmoment2_dtheta -2*self.mu_hat*self.dmu_hat_dtheta
+
+        self.dZ_dcav_mean = self.Z_hat/self.cavity_sigma2*(self.mu_hat - self.cavity_means)
+        self.dZ_dcav_var = self.Z_hat/self.cavity_sigma2**2/2*(self.moment2 + self.cavity_means**2
+                                                               -2*self.cavity_means*self.mu_hat) -0.5*self.Z_hat/self.cavity_sigma2
+
+        self.dmu_hat_dcav_mean = self.sigma2_hat/self.cavity_sigma2
+        self.dmu_hat_dcav_var = -0.5*self.mu_hat/self.cavity_sigma2 + 0.5*(self.moment3
+                                                                         + self.cavity_means**2*self.mu_hat -2*self.cavity_means*self.moment2)/self.cavity_sigma2
+
+
+        self.dsigma2_dcav_mean = (self.moment3 - self.mu_hat*self.moment2)/self.cavity_sigma2 -2.*self.mu_hat*self.dmu_hat_dcav_mean
+        self.dsigma2_dcav_var = -0.5*self.moment2/self.cavity_sigma2 + 0.5/self.cavity_sigma2**2*(self.moment4 + self.moment2*self.cavity_means**2 - 2.*self.moment3
+                                                                                                  *self.cavity_means) - self.moment2*self.dZ_dcav_var/self.Z_hat -2*self.mu_hat*self.dmu_hat_dcav_var
 
 class cavityParams(object):
     def __init__(self, num_data):
