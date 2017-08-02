@@ -116,13 +116,14 @@ def quadgk_int(f, fmin=-np.inf, fmax=np.inf, difftol=0.1):
     integrand = quadvgk(trans_func, -1., 1., difftol, difftol)
     return integrand
 
-def integrate(Y, mu, sigma, lik, get_derivs=False):
+def integrate(Y, mu, sigma, Y_metadata_i=None, lik=None, get_derivs=False):
     fmin = -np.inf
     fmax = np.inf
     SQRT_2PI = np.sqrt(2.*np.pi)
     assert np.array(Y).size == 1
+
     def generate_integral(f):
-        a = np.exp(lik.logpdf_link(f, Y)) * np.exp(-0.5 * np.square((f - mu) / sigma)) / (
+        a = np.exp(lik.logpdf_link(f, Y, Y_metadata=Y_metadata_i)) * np.exp(-0.5 * np.square((f - mu) / sigma)) / (
                 SQRT_2PI * sigma)
         powers = np.power(f, np.arange(5)[:,None])
         pp = powers[:3]

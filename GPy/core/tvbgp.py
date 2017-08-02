@@ -15,6 +15,10 @@ class TVB(GP):
     """
     First stab at trying to code TVB for GPs.
 
+    Based on "Tilted Variational Bayes"
+    by James Hensman, Max Zwiessele, ND Lawrence
+    http://proceedings.mlr.press/v33/hensman14.pdf
+    Inference using TVB/Variational EP
     """
 
     def __init__(self, X, Y, kernel, likelihood, mean_function=None, name='tvbgp', Y_metadata=None):
@@ -51,4 +55,3 @@ class TVB(GP):
 
         print(self.grad_dict['dL_dthetaL'])
         self.likelihood.update_gradients(dL_dthetaL)
-

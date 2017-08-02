@@ -19,11 +19,12 @@ class marginalMoments(object):
         self.sigma2_hat = np.empty(num_data,dtype=np.float64)
 
 class QuadTilted(marginalMoments):
-    def __init__(self, Y, lik):
+    def __init__(self, Y, lik, Y_metadata=None):
         self.num_data = len(Y.flatten())
         super(QuadTilted, self).__init__(self.num_data)
         self.Y = Y
         self.lik = lik
+        self.Y_metadata = Y_metadata
         # number of free parameters is equal to the number of unconstrained params of likelihood ...
         self.num_params = self.lik.size
 
@@ -32,14 +33,35 @@ class QuadTilted(marginalMoments):
         self.cavity_sigma2 = sigma2
         self.cavity_sigma = np.sqrt(sigma2)
 
+    @staticmethod
+    def dict_to_list(Y_metadata, num_data):
+        if Y_metadata is not None:
+            # Pick out the relevant metadata for Yi
+            Y_metadata_list = []
+
+            for i in range(num_data):
+                Y_metadata_i = {}
+                for key in Y_metadata.keys():
+                    Y_metadata_i[key] = Y_metadata[key][i, :]
+                Y_metadata_list.append(Y_metadata_i)
+            return Y_metadata_list
+
+
     def compute_moments(self, mu, sigma2):
         self.set_cavity(mu, sigma2)
+        self.Y_metadata_list = []
+
+        self.Y_metadata_list = self.dict_to_list(self.Y_metadata, self.num_data)
+
         if self.lik.size:
             f = partial(quad_integrate.integrate, lik=self.lik, get_derivs=True)
         else:
             f = partial(quad_integrate.integrate, lik=self.lik)
 
-        quads, numevals = zip(*map(f, self.Y, self.cavity_means, self.cavity_sigma))
+        if self.Y_metadata is not None:
+            quads, numevals = zip(*map(f, self.Y, self.cavity_means, self.cavity_sigma, self.Y_metadata_list))
+        else:
+            quads, numevals = zip(*map(f, self.Y, self.cavity_means, self.cavity_sigma))
         quads = np.vstack(quads)
 
         self.Z_hat = quads[:,0]
@@ -60,8 +82,9 @@ class QuadTilted(marginalMoments):
                                                                -2*self.cavity_means*self.mu_hat) -0.5*self.Z_hat/self.cavity_sigma2
 
         self.dmu_hat_dcav_mean = self.sigma2_hat/self.cavity_sigma2
-        self.dmu_hat_dcav_var = -0.5*self.mu_hat/self.cavity_sigma2 + 0.5*(self.moment3
-                                                                         + self.cavity_means**2*self.mu_hat -2*self.cavity_means*self.moment2)/self.cavity_sigma2
+        self.dmu_hat_dcav_var = -0.5*self.mu_hat/self.cavity_sigma2 + \
+                                0.5*(self.moment3+ self.cavity_means**2*self.mu_hat
+                                     -2*self.cavity_means*self.moment2)/self.cavity_sigma2**2 - self.mu_hat*self.dZ_dcav_var/self.Z_hat
 
 
         self.dsigma2_dcav_mean = (self.moment3 - self.mu_hat*self.moment2)/self.cavity_sigma2 -2.*self.mu_hat*self.dmu_hat_dcav_mean

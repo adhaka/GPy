@@ -27,7 +27,7 @@ class TVB(LatentFunctionInference):
         self.Sigma,_,_,self.log_det_Sigma_inv = pdinv(self.Sigma_inv)
         self.diag_Sigma = np.diag(self.Sigma)
         self.mu = np.dot(self.Sigma, self.beta*self.Ytilde )
-        self.tilted = QuadTilted(Y, likelihood)
+        self.tilted = QuadTilted(Y, likelihood, Y_metadata)
 
         #compute cavity means, vars (all at once!)
         self.cavity_vars = 1./(1./self.diag_Sigma - self.beta)
@@ -45,6 +45,20 @@ class TVB(LatentFunctionInference):
         C = np.sum(np.log(self.tilted.Z_hat))
         log_marginal = A + B + C
         return log_marginal
+
+    def _alternate_log_marginal(self):
+        """
+        adding the term KL[q||p(f|Ytilde)] to the original lower bound given above- which makes it similar to
+        nested EP.
+
+        :return:
+        """
+        A = self.K + np.diag(1./self.beta)
+        Ai, L, Li, log_det = pdinv(A)
+        Ai_ = self.Ki - self.Ki.dot(self.Sigma).dot(self.Ki)
+        log_det =self.K_logdet + self.log_det_Sigma_inv - np.sum(np.log(self.beta))
+
+        return -0.5*self.num_data*np.log(2.*np.pi) - 0.5*log_det - 0.5*Ai.dot(self.Ytilde).dot(self.Ytilde)
 
     def _log_likelihood_grads(self):
         dcav_vars_dbeta = -(self.Sigma**2/self.diag_Sigma**2 - np.eye(self.num_data))*self.cavity_vars**2
