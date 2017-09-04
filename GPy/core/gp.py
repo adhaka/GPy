@@ -148,14 +148,16 @@ class GP(Model):
                 # LVM models
                 if isinstance(self.X, VariationalPosterior):
                     assert isinstance(X, type(self.X)), "The given X must have the same type as the X in the model!"
+                    index = self.X._parent_index_
                     self.unlink_parameter(self.X)
                     self.X = X
-                    self.link_parameter(self.X)
+                    self.link_parameter(self.X, index=index)
                 else:
+                    index = self.X._parent_index_
                     self.unlink_parameter(self.X)
                     from ..core import Param
-                    self.X = Param('latent mean',X)
-                    self.link_parameter(self.X)
+                    self.X = Param('latent mean', X)
+                    self.link_parameter(self.X, index=index)
             else:
                 self.X = ObsAr(X)
         self.update_model(True)
@@ -602,4 +604,8 @@ class GP(Model):
         mu_star, var_star = self._raw_predict(x_test)
         return self.likelihood.log_predictive_density_sampling(y_test, mu_star, var_star, Y_metadata=Y_metadata, num_samples=num_samples)
 
-
+    def LOO(self):
+        """
+        Evaluate the approximate leave one out error using the current state of the inference method
+        """
+        return self.inference_method.LOO(self.kern, self.X, self.Y, self.likelihood, self.posterior, Y_metadata=self.Y_metadata)
