@@ -25,6 +25,8 @@ def oil(num_inducing=50, max_iters=100, kernel=None, optimize=True, plot=True):
     # Create GP model
     m = GPy.models.SparseGPClassification(X, Y, kernel=kernel, num_inducing=num_inducing)
     m.Ytest = Ytest
+    print "Number of training examples:", X.shape[0]
+    print "Number of test examples:", Xtest.shape[0]
 
     # Contrain all parameters to be positive
     #m.tie_params('.*len')
@@ -258,3 +260,7 @@ def crescent_data(model_type='Full', num_inducing=10, seed=default_seed, kernel=
 
     print(m)
     return m
+
+if __name__ == '__main__':
+    oil()
+    sparse_toy_linear_1d_classification()
