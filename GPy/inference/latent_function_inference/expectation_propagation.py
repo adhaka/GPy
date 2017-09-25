@@ -127,7 +127,7 @@ class posteriorParamsDTC(posteriorParamsBase):
         #mu = np.dot(Sigma, v_tilde)
 
     @staticmethod
-    def _recompute(LLT0, Kmn, ga_approx):
+    def _recompute(LLT0, Kmn, ga_approx, covCorr):
         LLT = LLT0 + np.dot(Kmn*ga_approx.tau[None,:],Kmn.T)
         L = jitchol(LLT)
         V, _ = dtrtrs(L,Kmn,lower=1)
@@ -135,6 +135,7 @@ class posteriorParamsDTC(posteriorParamsBase):
         #Knmv_tilde = np.dot(Kmn,v_tilde)
         #mu = np.dot(V2.T,Knmv_tilde)
         Sigma = np.dot(V.T,V)
+        # Sigma += covCorr
         mu = np.dot(Sigma, ga_approx.v)
         Sigma_diag = np.diag(Sigma).copy()
         return posteriorParamsDTC(mu, Sigma_diag), LLT
@@ -241,7 +242,7 @@ class EP(EPBase, ExactGaussianInference):
         # than ObsArrays
         Y = Y.values.copy()
 
-        #Initial values - Marginal moments, cavity params, gaussian approximation params and posterior params
+        #Initial values - Marginal moments, cavity params, gaussian approximation params(site params) and posterior params
         marg_moments = marginalMoments(num_data)
         cav_params = cavityParams(num_data)
         ga_approx, post_params = self._init_approximations(K, num_data)
@@ -373,7 +374,7 @@ class EP(EPBase, ExactGaussianInference):
         return ee
 
 class EPDTC(EPBase, VarDTC):
-    def inference(self, kern, X, Z, likelihood, Y, mean_function=None, Y_metadata=None, Lm=None, dL_dKmm=None, psi0=None, psi1=None, psi2=None):
+    def inference(self, kern, X, Z, likelihood, Y, mean_function=None, Y_metadata=None, Lm=None, Knn=None, dL_dKmm=None, psi0=None, psi1=None, psi2=None):
         if self.always_reset:
             self.reset()
 
@@ -383,6 +384,9 @@ class EPDTC(EPBase, VarDTC):
         if Lm is None:
             Kmm = kern.K(Z)
             Lm = jitchol(Kmm)
+
+        if Knn is None:
+            Knn = kern.K(X)
 
         if psi1 is None:
             try:
@@ -395,11 +399,11 @@ class EPDTC(EPBase, VarDTC):
         if self.ep_mode=="nested":
             #Force EP at each step of the optimization
             self._ep_approximation = None
-            post_params, ga_approx, log_Z_tilde = self._ep_approximation = self.expectation_propagation(Kmm, Kmn, Y, likelihood, Y_metadata)
+            post_params, ga_approx, log_Z_tilde = self._ep_approximation = self.expectation_propagation(Knn, Kmm, Kmn, Y, likelihood, Y_metadata)
         elif self.ep_mode=="alternated":
             if getattr(self, '_ep_approximation', None) is None:
                 #if we don't yet have the results of runnign EP, run EP and store the computed factors in self._ep_approximation
-                post_params, ga_approx, log_Z_tilde = self._ep_approximation = self.expectation_propagation(Kmm, Kmn, Y, likelihood, Y_metadata)
+                post_params, ga_approx, log_Z_tilde = self._ep_approximation = self.expectation_propagation(Knn, Kmm, Kmn, Y, likelihood, Y_metadata)
             else:
                 #if we've already run EP, just use the existing approximation stored in self._ep_approximation
                 post_params, ga_approx, log_Z_tilde = self._ep_approximation
@@ -415,7 +419,7 @@ class EPDTC(EPBase, VarDTC):
                                             Lm=Lm, dL_dKmm=dL_dKmm,
                                             psi0=psi0, psi1=psi1, psi2=psi2, Z_tilde=log_Z_tilde)
 
-    def expectation_propagation(self, Kmm, Kmn, Y, likelihood, Y_metadata):
+    def expectation_propagation(self, Knn, Kmm, Kmn, Y, likelihood, Y_metadata):
 
         num_data, output_dim = Y.shape
         assert output_dim == 1, "This EP methods only works for 1D outputs"
@@ -427,15 +431,17 @@ class EPDTC(EPBase, VarDTC):
         #Initial values - Marginal moments, cavity params, gaussian approximation params and posterior params
         marg_moments = marginalMoments(num_data)
         cav_params = cavityParams(num_data)
-        ga_approx, post_params, LLT0, LLT = self._init_approximations(Kmm, Kmn, num_data)
+        ga_approx, post_params, LLT0, LLT, Qnn = self._init_approximations(Knn, Kmm, Kmn, num_data)
 
+        # posterior covariance matrix correction- "uncollapsing"= Knn - Qnn.
+        covCorr = Knn - Qnn
         #Approximation
         stop = False
         iterations = 0
         while not stop and (iterations < self.max_iters):
             self._local_updates(num_data, LLT0, LLT, Kmn, cav_params, post_params, marg_moments, ga_approx, likelihood, Y, Y_metadata)
             #(re) compute Sigma, Sigma_diag and mu using full Cholesky decompy
-            post_params, LLT = posteriorParamsDTC._recompute(LLT0, Kmn, ga_approx)
+            post_params, LLT = posteriorParamsDTC._recompute(LLT0, Kmn, ga_approx, covCorr)
             post_params.Sigma_diag = np.maximum(post_params.Sigma_diag, np.finfo(float).eps)
 
             #monitor convergence
@@ -456,18 +462,22 @@ class EPDTC(EPBase, VarDTC):
         return np.sum((np.log(marg_moments.Z_hat) + 0.5*np.log(2*np.pi) + 0.5*np.log(sigma2_sigma2tilde)
                          + 0.5*((mu_cav - mu_tilde)**2) / (sigma2_sigma2tilde)))
 
-    def _init_approximations(self, Kmm, Kmn, num_data):
+    def _init_approximations(self, Knn, Kmm, Kmn, num_data):
         #initial values - Gaussian factors
         #Initial values - Posterior distribution parameters: q(f|X,Y) = N(f|mu,Sigma)
         LLT0 = Kmm.copy()
         Lm = jitchol(LLT0) #K_m = L_m L_m^\top
         Vm,info = dtrtrs(Lm, Kmn,lower=1)
-        # Lmi = dtrtri(Lm)
-        # Kmmi = np.dot(Lmi.T,Lmi)
-        # KmmiKmn = np.dot(Kmmi,Kmn)
+        Lmi = dtrtri(Lm)
+        Kmmi = np.dot(Lmi.T,Lmi)
+        KmmiKmn = np.dot(Kmmi,Kmn)
+        Knm = Kmn.T
+        KmnKmmiKmn = np.dot(Knm, KmmiKmn)
+        Qnn = KmnKmmiKmn
+        covCorr = Knn - Qnn
         # Qnn_diag = np.sum(Kmn*KmmiKmn,-2)
         Qnn_diag = np.sum(Vm*Vm,-2) #diag(Knm Kmm^(-1) Kmn)
-        #diag.add(LLT0, 1e-8)
+        diag.add(LLT0, 1e-8)
         if self.ga_approx_old is None:
             #Initial values - Posterior distribution parameters: q(f|X,Y) = N(f|mu,Sigma)
             LLT = LLT0.copy() #Sigma = K.copy()
@@ -480,12 +490,12 @@ class EPDTC(EPBase, VarDTC):
         else:
             assert self.ga_approx_old.v.size == num_data, "data size mis-match: did you change the data? try resetting!"
             ga_approx = gaussianApproximation(self.ga_approx_old.v, self.ga_approx_old.tau)
-            post_params, LLT = posteriorParamsDTC._recompute(LLT0, Kmn, ga_approx)
+            post_params, LLT = posteriorParamsDTC._recompute(LLT0, Kmn, ga_approx, covCorr)
             post_params.Sigma_diag += 1e-8
 
             # TODO: Check the log-marginal under both conditions and choose the best one
 
-        return (ga_approx, post_params, LLT0, LLT)
+        return (ga_approx, post_params, LLT0, LLT, Qnn)
 
     def _local_updates(self, num_data, LLT0, LLT, Kmn, cav_params, post_params, marg_moments, ga_approx, likelihood, Y, Y_metadata, update_order=None):
         if update_order is None:
