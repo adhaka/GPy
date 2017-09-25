@@ -127,7 +127,7 @@ class posteriorParamsDTC(posteriorParamsBase):
         #mu = np.dot(Sigma, v_tilde)
 
     @staticmethod
-    def _recompute(LLT0, Kmn, ga_approx, covCorr):
+    def _recompute(LLT0, Kmn, ga_approx, covCorr, first_time=False):
         LLT = LLT0 + np.dot(Kmn*ga_approx.tau[None,:],Kmn.T)
         L = jitchol(LLT)
         V, _ = dtrtrs(L,Kmn,lower=1)
@@ -135,7 +135,8 @@ class posteriorParamsDTC(posteriorParamsBase):
         #Knmv_tilde = np.dot(Kmn,v_tilde)
         #mu = np.dot(V2.T,Knmv_tilde)
         Sigma = np.dot(V.T,V)
-        # Sigma += covCorr
+        if first_time:
+            Sigma += covCorr
         mu = np.dot(Sigma, ga_approx.v)
         Sigma_diag = np.diag(Sigma).copy()
         return posteriorParamsDTC(mu, Sigma_diag), LLT
@@ -477,6 +478,7 @@ class EPDTC(EPBase, VarDTC):
         covCorr = Knn - Qnn
         # Qnn_diag = np.sum(Kmn*KmmiKmn,-2)
         Qnn_diag = np.sum(Vm*Vm,-2) #diag(Knm Kmm^(-1) Kmn)
+
         # diag.add(LLT0, 1e-8)
         if self.ga_approx_old is None:
             #Initial values - Posterior distribution parameters: q(f|X,Y) = N(f|mu,Sigma)
@@ -490,7 +492,7 @@ class EPDTC(EPBase, VarDTC):
         else:
             assert self.ga_approx_old.v.size == num_data, "data size mis-match: did you change the data? try resetting!"
             ga_approx = gaussianApproximation(self.ga_approx_old.v, self.ga_approx_old.tau)
-            post_params, LLT = posteriorParamsDTC._recompute(LLT0, Kmn, ga_approx, covCorr)
+            post_params, LLT = posteriorParamsDTC._recompute(LLT0, Kmn, ga_approx, covCorr, first_time=True)
             post_params.Sigma_diag += 1e-8
 
             # TODO: Check the log-marginal under both conditions and choose the best one

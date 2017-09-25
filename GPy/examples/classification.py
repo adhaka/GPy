@@ -262,5 +262,5 @@ def crescent_data(model_type='Full', num_inducing=10, seed=default_seed, kernel=
     return m
 
 if __name__  == '__main__':
-    oil(num_inducing=5)
+    oil(num_inducing=3)
     sparse_toy_linear_1d_classification()
