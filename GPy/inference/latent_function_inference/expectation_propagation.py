@@ -477,7 +477,7 @@ class EPDTC(EPBase, VarDTC):
         covCorr = Knn - Qnn
         # Qnn_diag = np.sum(Kmn*KmmiKmn,-2)
         Qnn_diag = np.sum(Vm*Vm,-2) #diag(Knm Kmm^(-1) Kmn)
-        diag.add(LLT0, 1e-8)
+        # diag.add(LLT0, 1e-8)
         if self.ga_approx_old is None:
             #Initial values - Posterior distribution parameters: q(f|X,Y) = N(f|mu,Sigma)
             LLT = LLT0.copy() #Sigma = K.copy()
