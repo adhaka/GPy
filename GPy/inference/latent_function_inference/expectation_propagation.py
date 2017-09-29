@@ -116,18 +116,19 @@ class posteriorParamsDTC(posteriorParamsBase):
     def __init__(self, mu, Sigma_diag):
         super(posteriorParamsDTC, self).__init__(mu, Sigma_diag)
 
-    def _update_rank1(self, LLT, Kmn, delta_v, delta_tau, i):
+    def _update_rank1(self, LLT, Kmn, delta_v, delta_tau, i, covCorr_trace):
         #DSYR(Sigma, Sigma[:,i].copy(), -delta_tau/(1.+ delta_tau*Sigma[i,i]))
         DSYR(LLT,Kmn[:,i].copy(),delta_tau)
         L = jitchol(LLT)
         V,info = dtrtrs(L,Kmn,lower=1)
         self.Sigma_diag = np.maximum(np.sum(V*V,-2), np.finfo(float).eps)  #diag(K_nm (L L^\top)^(-1)) K_mn
+        self.Sigma_diag += covCorr_trace
         si = np.sum(V.T*V[:,i],-1) #(V V^\top)[:,i]
         self.mu += (delta_v-delta_tau*self.mu[i])*si
         #mu = np.dot(Sigma, v_tilde)
 
     @staticmethod
-    def _recompute(LLT0, Kmn, ga_approx, covCorr, first_time=False):
+    def _recompute(LLT0, Kmn, ga_approx, covCorr_trace):
         LLT = LLT0 + np.dot(Kmn*ga_approx.tau[None,:],Kmn.T)
         L = jitchol(LLT)
         V, _ = dtrtrs(L,Kmn,lower=1)
@@ -135,8 +136,7 @@ class posteriorParamsDTC(posteriorParamsBase):
         #Knmv_tilde = np.dot(Kmn,v_tilde)
         #mu = np.dot(V2.T,Knmv_tilde)
         Sigma = np.dot(V.T,V)
-        if first_time:
-            Sigma += covCorr
+        Sigma += np.diag(covCorr_trace)
         mu = np.dot(Sigma, ga_approx.v)
         Sigma_diag = np.diag(Sigma).copy()
         return posteriorParamsDTC(mu, Sigma_diag), LLT
@@ -436,13 +436,14 @@ class EPDTC(EPBase, VarDTC):
 
         # posterior covariance matrix correction- "uncollapsing"= Knn - Qnn.
         covCorr = Knn - Qnn
+        covCorr_trace = np.diag(covCorr)
         #Approximation
         stop = False
         iterations = 0
         while not stop and (iterations < self.max_iters):
-            self._local_updates(num_data, LLT0, LLT, Kmn, cav_params, post_params, marg_moments, ga_approx, likelihood, Y, Y_metadata)
+            self._local_updates(num_data, LLT0, LLT, Kmn, cav_params, post_params, marg_moments, ga_approx, likelihood, Y, Y_metadata, covCorr_trace)
             #(re) compute Sigma, Sigma_diag and mu using full Cholesky decompy
-            post_params, LLT = posteriorParamsDTC._recompute(LLT0, Kmn, ga_approx, covCorr)
+            post_params, LLT = posteriorParamsDTC._recompute(LLT0, Kmn, ga_approx, covCorr_trace)
             post_params.Sigma_diag = np.maximum(post_params.Sigma_diag, np.finfo(float).eps)
 
             #monitor convergence
@@ -450,6 +451,7 @@ class EPDTC(EPBase, VarDTC):
                 stop = self._stop_criteria(ga_approx)
             self.ga_approx_old = gaussianApproximation(ga_approx.v.copy(), ga_approx.tau.copy())
             iterations += 1
+            # print iterations
 
         log_Z_tilde = self._log_Z_tilde(marg_moments, ga_approx, cav_params)
 
@@ -476,6 +478,8 @@ class EPDTC(EPBase, VarDTC):
         KmnKmmiKmn = np.dot(Knm, KmmiKmn)
         Qnn = KmnKmmiKmn
         covCorr = Knn - Qnn
+        covCorr_trace = np.diag(covCorr)
+        covCorr_mat = np.diag(np.diag(covCorr))
         # Qnn_diag = np.sum(Kmn*KmmiKmn,-2)
         Qnn_diag = np.sum(Vm*Vm,-2) #diag(Knm Kmm^(-1) Kmn)
 
@@ -492,14 +496,14 @@ class EPDTC(EPBase, VarDTC):
         else:
             assert self.ga_approx_old.v.size == num_data, "data size mis-match: did you change the data? try resetting!"
             ga_approx = gaussianApproximation(self.ga_approx_old.v, self.ga_approx_old.tau)
-            post_params, LLT = posteriorParamsDTC._recompute(LLT0, Kmn, ga_approx, covCorr, first_time=True)
+            post_params, LLT = posteriorParamsDTC._recompute(LLT0, Kmn, ga_approx, covCorr_trace)
             post_params.Sigma_diag += 1e-8
 
             # TODO: Check the log-marginal under both conditions and choose the best one
 
         return (ga_approx, post_params, LLT0, LLT, Qnn)
 
-    def _local_updates(self, num_data, LLT0, LLT, Kmn, cav_params, post_params, marg_moments, ga_approx, likelihood, Y, Y_metadata, update_order=None):
+    def _local_updates(self, num_data, LLT0, LLT, Kmn, cav_params, post_params, marg_moments, ga_approx, likelihood, Y, Y_metadata, covCorr_trace, update_order=None):
         if update_order is None:
             update_order = np.random.permutation(num_data)
         for i in update_order:
@@ -523,4 +527,4 @@ class EPDTC(EPBase, VarDTC):
 
             #Posterior distribution parameters update
             if self.parallel_updates == False:
-                post_params._update_rank1(LLT, Kmn, delta_v, delta_tau, i)
+                post_params._update_rank1(LLT, Kmn, delta_v, delta_tau, i, covCorr_trace)

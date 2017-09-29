@@ -6,7 +6,7 @@ Gaussian Processes classification examples
 import GPy
 import numpy as np
 
-default_seed = 111
+default_seed = 555
 
 def oil(num_inducing=50, max_iters=100, kernel=None, optimize=True, plot=True):
     """
@@ -262,5 +262,5 @@ def crescent_data(model_type='Full', num_inducing=10, seed=default_seed, kernel=
     return m
 
 if __name__  == '__main__':
-    oil(num_inducing=3)
+    oil(num_inducing=6)
     sparse_toy_linear_1d_classification()
