@@ -6,9 +6,9 @@ Gaussian Processes classification examples
 import GPy
 import numpy as np
 
-default_seed = 555
+default_seed = 865
 
-def oil(num_inducing=50, max_iters=100, kernel=None, optimize=True, plot=True):
+def oil(num_inducing=50, max_iters=100, full_var=True, kernel=None, optimize=True, plot=True):
     """
     Run a Gaussian process classification on the three phase oil data. The demonstration calls the basic GP classification model and uses EP to approximate the likelihood.
 
@@ -25,7 +25,8 @@ def oil(num_inducing=50, max_iters=100, kernel=None, optimize=True, plot=True):
     Ytest[Ytest.flatten()==-1] = 0
 
     # Create GP model
-    m = GPy.models.SparseGPClassification(X, Y, kernel=kernel, num_inducing=num_inducing)
+    m = GPy.models.SparseGPClassification(X, Y, kernel=kernel, num_inducing=num_inducing, full_var=full_var)
+
     m.Ytest = Ytest
 
     # Contrain all parameters to be positive
@@ -132,7 +133,9 @@ def sparse_toy_linear_1d_classification(num_inducing=10, seed=default_seed, opti
     Y[Y.flatten() == -1] = 0
 
     # Model definition
-    m = GPy.models.SparseGPClassification(data['X'], Y, num_inducing=num_inducing)
+    # m = GPy.models.SparseGPClassification(data['X'], Y, num_inducing=num_inducing)
+    # m = GPy.models.SparseGPClassification(data['X'], Y, num_inducing=num_inducing, full_var=True)
+    m = GPy.models.SparseGPClassification(data['X'], Y, num_inducing=num_inducing, full_var=True)
     m['.*len'] = 4.
 
     # Optimize
@@ -262,5 +265,6 @@ def crescent_data(model_type='Full', num_inducing=10, seed=default_seed, kernel=
     return m
 
 if __name__  == '__main__':
-    oil(num_inducing=6)
-    sparse_toy_linear_1d_classification()
+    # oil(num_inducing=6, full_var=True)
+    oil(num_inducing=6, full_var=False)
+    # sparse_toy_linear_1d_classification(seed=default_seed)

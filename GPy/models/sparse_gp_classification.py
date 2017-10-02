@@ -6,7 +6,7 @@ import numpy as np
 from ..core import SparseGP
 from .. import likelihoods
 from .. import kern
-from ..inference.latent_function_inference import EPDTC
+from ..inference.latent_function_inference import EPDTC, EP_Var
 
 class SparseGPClassification(SparseGP):
     """
@@ -26,7 +26,7 @@ class SparseGPClassification(SparseGP):
 
     """
 
-    def __init__(self, X, Y=None, likelihood=None, kernel=None, Z=None, num_inducing=10, Y_metadata=None):
+    def __init__(self, X, Y=None, likelihood=None, kernel=None, Z=None, num_inducing=10, Y_metadata=None, full_var=False):
         if kernel is None:
             kernel = kern.RBF(X.shape[1])
 
@@ -38,7 +38,11 @@ class SparseGPClassification(SparseGP):
         else:
             assert Z.shape[1] == X.shape[1]
 
-        SparseGP.__init__(self, X, Y, Z, kernel, likelihood, inference_method=EPDTC(), name='SparseGPClassification',Y_metadata=Y_metadata)
+        if full_var:
+            print 'hii'
+            SparseGP.__init__(self, X, Y, Z, kernel, likelihood, inference_method=EP_Var(), name='SparseGPClassification', Y_metadata=Y_metadata)
+        else:
+            SparseGP.__init__(self, X, Y, Z, kernel, likelihood, inference_method=EPDTC(), name='SparseGPClassification',Y_metadata=Y_metadata)
 
 class SparseGPClassificationUncertainInput(SparseGP):
     """
