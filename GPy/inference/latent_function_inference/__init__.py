@@ -84,7 +84,7 @@ class InferenceMethodList(LatentFunctionInference, list):
 from .exact_gaussian_inference import ExactGaussianInference
 from .laplace import Laplace,LaplaceBlock
 from GPy.inference.latent_function_inference.var_dtc import VarDTC
-from .expectation_propagation import EP, EPDTC, EP_Var
+from .expectation_propagation import EP, EPDTC, EP_Var, EP_Var_Parallel
 from .dtc import DTC
 from .fitc import FITC
 from .pep import PEP
