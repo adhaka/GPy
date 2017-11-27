@@ -85,6 +85,8 @@ from .exact_gaussian_inference import ExactGaussianInference
 from .laplace import Laplace,LaplaceBlock
 from GPy.inference.latent_function_inference.var_dtc import VarDTC
 from .expectation_propagation import EP, EPDTC, EP_Var, EP_Var_Parallel
+from .expectation_propagation import EPBase
+from .expectation_propagation_parallel import EP_Var_Parallel
 from .dtc import DTC
 from .fitc import FITC
 from .pep import PEP
