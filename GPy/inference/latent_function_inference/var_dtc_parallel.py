@@ -132,6 +132,28 @@ class VarDTC_minibatch(LatentFunctionInference):
 
         return psi0_full, psi1Y_full, psi2_full, YRY_full
 
+    # wrapper function around the other two functions, this function will interact with EP class
+    def inference_ep_parallel(self, kern, X, Z, likelihood, Y, Y_metadata=None, mean_function=None, precision=None, Lm=None, dL_dKmm=None, psi0=None, psi1=None, psi2=None, Z_tilde=None):
+        assert mean_function is None, "inference with a mean function not implemented"
+
+        num_data, output_dim = Y.shape
+        num_inducing = Z.shape[0]
+
+        uncertain_inputs = isinstance(X, VariationalPosterior)
+
+
+        """
+        wrapper function around the other two functions, this function will interact with EP class
+        :param kern:
+        :param X:
+        :param Z:
+        :param likelihood:
+        :param Y:
+        :param Y_metadata:
+        :return:
+        """
+        logL, dL_dKmm, post = self.inference_likelihood(kern=kern, X=X, Z=Z, likelihood=)
+
     def inference_likelihood(self, kern, X, Z, likelihood, Y):
         """
         The first phase of inference:
@@ -226,7 +248,7 @@ class VarDTC_minibatch(LatentFunctionInference):
 
         return logL, dL_dKmm, post
 
-    def inference_minibatch(self, kern, X, Z, likelihood, Y):
+    def inference_minibatch(self, kern, X, Z, likelihood, Y, Y_metadata=None):
         """
         The second phase of inference: Computing the derivatives over a minibatch of Y
         Compute: dL_dpsi0, dL_dpsi1, dL_dpsi2, dL_dthetaL

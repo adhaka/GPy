@@ -4,9 +4,10 @@
 
 import numpy as np
 from ..core import SparseGP
+from ..core.sparse_gp_mpi import SparseGP_MPI
 from .. import likelihoods
 from .. import kern
-from ..inference.latent_function_inference import EPDTC, EP_Var
+from ..inference.latent_function_inference import EPDTC, EP_Var, EP_Var_Parallel
 
 class SparseGPClassification(SparseGP):
     """
@@ -43,6 +44,43 @@ class SparseGPClassification(SparseGP):
             SparseGP.__init__(self, X, Y, Z, kernel, likelihood, inference_method=EP_Var(), name='SparseGPClassification', Y_metadata=Y_metadata)
         else:
             SparseGP.__init__(self, X, Y, Z, kernel, likelihood, inference_method=EPDTC(), name='SparseGPClassification',Y_metadata=Y_metadata)
+
+
+class SparseGPClassification_MPI(SparseGP_MPI):
+    """
+    Sparse Gaussian Process model for classification
+
+    This is a thin wrapper around the sparse_GP class, with a set of sensible defaults
+
+    :param X: input observations
+    :param Y: observed values
+    :param likelihood: a GPy likelihood, defaults to Binomial with probit link_function
+    :param kernel: a GPy kernel, defaults to rbf+white
+    :param normalize_X:  whether to normalize the input data before computing (predictions will be in original scales)
+    :type normalize_X: False|True
+    :param normalize_Y:  whether to normalize the input data before computing (predictions will be in original scales)
+    :type normalize_Y: False|True
+    :rtype: model object
+
+    """
+
+    def __init__(self, X, Y=None, likelihood=None, kernel=None, Z=None, num_inducing=10, Y_metadata=None, full_var=False):
+        if kernel is None:
+            kernel = kern.RBF(X.shape[1])
+
+        likelihood = likelihoods.Bernoulli()
+
+        if Z is None:
+            i = np.random.permutation(X.shape[0])[:num_inducing]
+            Z = X[i].copy()
+        else:
+            assert Z.shape[1] == X.shape[1]
+
+        if full_var:
+            SparseGP_MPI.__init__(self, X, Y, Z, kernel, likelihood, inference_method=EP_Var_Parallel, name='SparseGPClassification', Y_metadata=Y_metadata)
+        else:
+            SparseGP_MPI.__init__(self, X, Y, Z, kernel, likelihood, inference_method=EPDTC(), name='SparseGPClassification',Y_metadata=Y_metadata)
+
 
 class SparseGPClassificationUncertainInput(SparseGP):
     """
