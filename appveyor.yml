@@ -3,17 +3,19 @@ environment:
     secure: 8/ZjXFwtd1S7ixd7PJOpptupKKEDhm2da/q3unabJ00=
   COVERALLS_REPO_TOKEN:
     secure: d3Luic/ESkGaWnZrvWZTKrzO+xaVwJWaRCEP0F+K/9DQGPSRZsJ/Du5g3s4XF+tS
-  gpy_version: 1.6.2
+  gpy_version: 1.8.5
   matrix:
     - PYTHON_VERSION: 2.7
       MINICONDA: C:\Miniconda-x64
     - PYTHON_VERSION: 3.5
       MINICONDA: C:\Miniconda35-x64
+    - PYTHON_VERSION: 3.6
+      MINICONDA: C:\Miniconda36-x64
 
 #configuration:
 #  - Debug
 #  - Release
-  
+
 install:
  - "set PATH=%MINICONDA%;%MINICONDA%\\Scripts;%PATH%"
  - conda config --set always_yes yes --set changeps1 no
@@ -31,7 +33,7 @@ install:
  - python -m pip install codecov
  - python -m pip install twine
  - "python setup.py develop"
- 
+
 build: off
 
 test_script:
@@ -49,7 +51,7 @@ after_test:
   # This step builds your wheels.
   - "python setup.py bdist_wheel bdist_wininst"
   - codecov
-  
+
 artifacts:
   # bdist_wheel puts your built wheel in the dist directory
   - path: dist\*
@@ -62,24 +64,15 @@ deploy_script:
 - echo     test >> %USERPROFILE%\\.pypirc
 - echo[
 - echo [pypi] >> %USERPROFILE%\\.pypirc
-- echo username:maxz >> %USERPROFILE%\\.pypirc
-- echo password:%pip_access% >> %USERPROFILE%\\.pypirc
+- echo username = maxz >> %USERPROFILE%\\.pypirc
+- echo password = %pip_access% >> %USERPROFILE%\\.pypirc
 - echo[
 - echo [test] >> %USERPROFILE%\\.pypirc
-- echo repository:https://test.pypi.org/legacy/ >> %USERPROFILE%\\.pypirc
-- echo username:maxz >> %USERPROFILE%\\.pypirc
-- echo password:%pip_access% >> %USERPROFILE%\\.pypirc
-- ps: >-
-    if ($env:APPVEYOR_REPO_BRANCH -eq 'devel') { 
-        twine upload --skip-existing -r test dist/*
-    }
-    elseif ($env:APPVEYOR_REPO_BRANCH -eq 'deploy') {  
-        twine upload --skip-existing dist/*
-    }
-    else {
-        echo not deploying on other branches
-    }
- 
+- echo repository = https://testpypi.python.org/pypi >> %USERPROFILE%\\.pypirc
+- echo username = maxz >> %USERPROFILE%\\.pypirc
+- echo password = %pip_access% >> %USERPROFILE%\\.pypirc
+- .appveyor_twine_upload.bat
+
 # deploy:
 #   - provider: GitHub
 #     release: GPy-v$(gpy_version)

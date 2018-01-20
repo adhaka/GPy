@@ -9,6 +9,7 @@ from .gplvm import GPLVM
 from .bcgplvm import BCGPLVM
 from .sparse_gplvm import SparseGPLVM
 from .warped_gp import WarpedGP
+from .input_warped_gp import InputWarpedGP
 from .bayesian_gplvm import BayesianGPLVM
 from .mrd import MRD
 from .gradient_checker import GradientChecker, HessianChecker, SkewChecker
@@ -26,3 +27,5 @@ from .state_space_model import StateSpace
 from .ibp_lfm import IBPLFM
 from .gp_offset_regression import GPOffsetRegression
 from .gp_grid_regression import GPRegressionGrid
+from .gp_multiout_regression import GPMultioutRegression
+from .gp_multiout_regression_md import GPMultioutRegressionMD

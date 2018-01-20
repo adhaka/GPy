@@ -70,6 +70,7 @@ def quadvgk(feval, fmin, fmax, tol1=1e-5, tol2=1e-5):
         Q2 = np.zeros((NF, NM))
         neval += x.size
 
+
         # for n=1:NF
         # F = reshape(FV(n,:), NK, []);
         # Q1(n,:) = M. * sum((WK * ones(1, NM)). * F);
@@ -93,6 +94,7 @@ def quadvgk(feval, fmin, fmax, tol1=1e-5, tol2=1e-5):
         Q = Q + np.sum(Q1[:,ind], axis=1)
         Subs = np.delete(Subs, ind, axis=1)
     return Q, neval
+
 
 def quadgk_int(f, fmin=-np.inf, fmax=np.inf, difftol=0.1):
     """
@@ -138,3 +140,4 @@ def integrate(Y, mu, sigma, Y_metadata_i=None, lik=None, get_derivs=False):
         return fn
 
     return quadgk_int(generate_integral, fmin=fmin, fmax=fmax)
+

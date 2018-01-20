@@ -206,7 +206,10 @@ def authorize_download(dataset_name=None):
 
 def download_data(dataset_name=None):
     """Check with the user that the are happy with terms and conditions for the data set, then download it."""
-    import itertools
+    try:
+        from itertools import zip_longest
+    except ImportError:
+        from itertools import izip_longest as zip_longest
 
     dr = data_resources[dataset_name]
     if not authorize_download(dataset_name):
@@ -220,8 +223,8 @@ def download_data(dataset_name=None):
     if 'suffices' in dr: zip_urls += (dr['suffices'], )
     else: zip_urls += ([],)
 
-    for url, files, save_names, suffices in itertools.zip_longest(*zip_urls, fillvalue=[]):
-        for f, save_name, suffix in itertools.zip_longest(files, save_names, suffices, fillvalue=None):
+    for url, files, save_names, suffices in zip_longest(*zip_urls, fillvalue=[]):
+        for f, save_name, suffix in zip_longest(files, save_names, suffices, fillvalue=None):
             download_url(os.path.join(url,f), dataset_name, save_name, suffix=suffix)
 
     return True
@@ -619,7 +622,7 @@ def robot_wireless(data_set='robot_wireless'):
         download_data(data_set)
     file_name = os.path.join(data_path, data_set, 'uw-floor.txt')
     all_time = np.genfromtxt(file_name, usecols=(0))
-    macaddress = np.genfromtxt(file_name, usecols=(1), dtype='string')
+    macaddress = np.genfromtxt(file_name, usecols=(1), dtype=str)
     x = np.genfromtxt(file_name, usecols=(2))
     y = np.genfromtxt(file_name, usecols=(3))
     strength = np.genfromtxt(file_name, usecols=(4))

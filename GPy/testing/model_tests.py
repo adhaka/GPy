@@ -259,29 +259,18 @@ class MiscTests(unittest.TestCase):
         np.testing.assert_equal(m.log_likelihood(), m2.log_likelihood())
 
     def test_missing_data(self):
-        from GPy import kern
-        from GPy.models.bayesian_gplvm_minibatch import BayesianGPLVMMiniBatch
-        from GPy.examples.dimensionality_reduction import _simulate_matern
+        Q = 4
 
-        D1, D2, D3, N, num_inducing, Q = 13, 5, 8, 400, 3, 4
-        _, _, Ylist = _simulate_matern(D1, D2, D3, N, num_inducing, False)
-        Y = Ylist[0]
-
-        inan = np.random.binomial(1, .9, size=Y.shape).astype(bool) # 80% missing data
-        Ymissing = Y.copy()
-        Ymissing[inan] = np.nan
-
-        k = kern.Linear(Q, ARD=True) + kern.White(Q, np.exp(-2)) # + kern.bias(Q)
-        m = BayesianGPLVMMiniBatch(Ymissing, Q, init="random", num_inducing=num_inducing,
-                          kernel=k, missing_data=True)
+        k = GPy.kern.Linear(Q, ARD=True) + GPy.kern.White(Q, np.exp(-2)) # + kern.bias(Q)
+        m = _create_missing_data_model(k, Q)
         assert(m.checkgrad())
         mul, varl = m.predict(m.X)
 
-        k = kern.RBF(Q, ARD=True) + kern.White(Q, np.exp(-2)) # + kern.bias(Q)
-        m2 = BayesianGPLVMMiniBatch(Ymissing, Q, init="random", num_inducing=num_inducing,
-                          kernel=k, missing_data=True)
+        k = GPy.kern.RBF(Q, ARD=True) + GPy.kern.White(Q, np.exp(-2)) # + kern.bias(Q)
+        m2 = _create_missing_data_model(k, Q)
         assert(m.checkgrad())
         m2.kern.rbf.lengthscale[:] = 1e6
+
         m2.X[:] = m.X.param_array
         m2.likelihood[:] = m.likelihood[:]
         m2.kern.white[:] = m.kern.white[:]
@@ -335,29 +324,29 @@ class MiscTests(unittest.TestCase):
         Y2 = np.random.normal(0, 1, (40, 6))
         Y3 = np.random.normal(0, 1, (40, 8))
         Q = 5
-        m = GPy.models.MRD(dict(data1=Y1, data2=Y2, data3=Y3), Q, 
+        m = GPy.models.MRD(dict(data1=Y1, data2=Y2, data3=Y3), Q,
                            )
         m.randomize()
         self.assertTrue(m.checkgrad())
-        
-        m = GPy.models.MRD(dict(data1=Y1, data2=Y2, data3=Y3), Q, initx='PCA_single', 
+
+        m = GPy.models.MRD(dict(data1=Y1, data2=Y2, data3=Y3), Q, initx='PCA_single',
                            initz='random',
-                           kernel=[GPy.kern.RBF(Q, ARD=1) for _ in range(3)], 
+                           kernel=[GPy.kern.RBF(Q, ARD=1) for _ in range(3)],
                            inference_method=InferenceMethodList([VarDTC() for _ in range(3)]),
                            likelihoods = [Gaussian(name='Gaussian_noise'.format(i)) for i in range(3)])
         m.randomize()
         self.assertTrue(m.checkgrad())
 
-        m = GPy.models.MRD(dict(data1=Y1, data2=Y2, data3=Y3), Q, initx='random', 
+        m = GPy.models.MRD(dict(data1=Y1, data2=Y2, data3=Y3), Q, initx='random',
                            initz='random',
-                           kernel=GPy.kern.RBF(Q, ARD=1), 
+                           kernel=GPy.kern.RBF(Q, ARD=1),
                            )
         m.randomize()
         self.assertTrue(m.checkgrad())
 
-        m = GPy.models.MRD(dict(data1=Y1, data2=Y2, data3=Y3), Q, X=np.random.normal(0,1,size=(40,Q)), 
+        m = GPy.models.MRD(dict(data1=Y1, data2=Y2, data3=Y3), Q, X=np.random.normal(0,1,size=(40,Q)),
                            X_variance=False,
-                           kernel=GPy.kern.RBF(Q, ARD=1), 
+                           kernel=GPy.kern.RBF(Q, ARD=1),
                            likelihoods = [Gaussian(name='Gaussian_noise'.format(i)) for i in range(3)])
         m.randomize()
         self.assertTrue(m.checkgrad())
@@ -398,6 +387,68 @@ class MiscTests(unittest.TestCase):
         m = GPy.models.GPRegression(X, Y)
         m.optimize()
         print(m)
+
+    def test_input_warped_gp_identity(self):
+        """
+        A InputWarpedGP with the identity warping function should be
+        equal to a standard GP.
+        """
+        k = GPy.kern.RBF(1)
+        m = GPy.models.GPRegression(self.X, self.Y, kernel=k)
+        m.optimize()
+        preds = m.predict(self.X)
+
+        warp_k = GPy.kern.RBF(1)
+        warp_f = GPy.util.input_warping_functions.IdentifyWarping()
+        warp_m = GPy.models.InputWarpedGP(self.X, self.Y, kernel=warp_k, warping_function=warp_f)
+        warp_m.optimize()
+        warp_preds = warp_m.predict(self.X)
+
+        np.testing.assert_almost_equal(preds, warp_preds, decimal=4)
+
+    def test_kumar_warping_gradient(self):
+        n_X = 100
+        np.random.seed(0)
+        X = np.random.randn(n_X, 2)
+        Y = np.sum(np.sin(X), 1).reshape(n_X, 1)
+
+        k1 = GPy.kern.Linear(2)
+        m1 = GPy.models.InputWarpedGP(X, Y, kernel=k1)
+        m1.randomize()
+        self.assertEquals(m1.checkgrad(), True)
+
+        k2 = GPy.kern.RBF(2)
+        m2 = GPy.models.InputWarpedGP(X, Y, kernel=k2)
+        m2.randomize()
+        m2.checkgrad()
+        self.assertEquals(m2.checkgrad(), True)
+
+        k3 = GPy.kern.Matern52(2)
+        m3 = GPy.models.InputWarpedGP(X, Y, kernel=k3)
+        m3.randomize()
+        m3.checkgrad()
+        self.assertEquals(m3.checkgrad(), True)
+
+    def test_kumar_warping_parameters(self):
+        np.random.seed(1)
+        X = np.random.rand(5, 2)
+        epsilon = 1e-6
+
+        # testing warping indices
+        warping_ind_1 = [0, 1, 2]
+        warping_ind_2 = [-1, 1, 2]
+        warping_ind_3 = [0, 1.5, 2]
+        self.failUnlessRaises(ValueError, GPy.util.input_warping_functions.KumarWarping, X, warping_ind_1)
+        self.failUnlessRaises(ValueError, GPy.util.input_warping_functions.KumarWarping, X, warping_ind_2)
+        self.failUnlessRaises(ValueError, GPy.util.input_warping_functions.KumarWarping, X, warping_ind_3)
+
+        # testing Xmin and Xmax
+        Xmin_1, Xmax_1 = None, [1, 1]
+        Xmin_2, Xmax_2 = [0, 0], None
+        Xmin_3, Xmax_3 = [0, 0, 0], [1, 1]
+        self.failUnlessRaises(ValueError, GPy.util.input_warping_functions.KumarWarping, X, [0, 1], epsilon, Xmin_1, Xmax_1)
+        self.failUnlessRaises(ValueError, GPy.util.input_warping_functions.KumarWarping, X, [0, 1], epsilon, Xmin_2, Xmax_2)
+        self.failUnlessRaises(ValueError, GPy.util.input_warping_functions.KumarWarping, X, [0, 1], epsilon, Xmin_3, Xmax_3)
 
     def test_warped_gp_identity(self):
         """
@@ -898,6 +949,167 @@ class GradientTests(np.testing.TestCase):
         m = SSGPLVM(Y, Q, init="rand", num_inducing=num_inducing, kernel=k, group_spike=True)
         m.randomize()
         self.assertTrue(m.checkgrad())
+
+    def test_multiout_regression(self):
+        np.random.seed(0)
+        import GPy
+
+        N = 10
+        N_train = 5
+        D = 4
+        noise_var = .3
+
+        k = GPy.kern.RBF(1,lengthscale=0.1)
+        x = np.random.rand(N,1)
+        cov = k.K(x)
+
+        k_r = GPy.kern.RBF(2,lengthscale=.4)
+        x_r = np.random.rand(D,2)
+        cov_r = k_r.K(x_r)
+
+        cov_all = np.kron(cov_r,cov)
+        L = GPy.util.linalg.jitchol(cov_all)
+
+        y_latent = L.dot(np.random.randn(N*D)).reshape(D,N).T
+
+        x_test = x[N_train:]
+        y_test = y_latent[N_train:]
+        x = x[:N_train]
+        y = y_latent[:N_train]+np.random.randn(N_train,D)*np.sqrt(noise_var)
+
+        Mr = D
+        Mc = x.shape[0]
+        Qr = 5
+        Qc = x.shape[1]
+
+        m_mr = GPy.models.GPMultioutRegression(x,y,Xr_dim=Qr, kernel_row=GPy.kern.RBF(Qr,ARD=True), num_inducing=(Mc,Mr),init='GP')
+        m_mr.optimize_auto(max_iters=1)
+        m_mr.randomize()
+        self.assertTrue(m_mr.checkgrad())
+
+        m_mr = GPy.models.GPMultioutRegression(x,y,Xr_dim=Qr, kernel_row=GPy.kern.RBF(Qr,ARD=True), num_inducing=(Mc,Mr),init='rand')
+        m_mr.optimize_auto(max_iters=1)
+        m_mr.randomize()
+        self.assertTrue(m_mr.checkgrad())
+
+    def test_multiout_regression_md(self):
+        import GPy
+        np.random.seed(0)
+
+        N = 20
+        N_train = 5
+        D = 8
+        noise_var = 0.3
+
+        k = GPy.kern.RBF(1,lengthscale=0.1)
+        x_raw = np.random.rand(N*D,1)
+
+        # dimension assignment
+        D_list = []
+        for i in range(2):
+            while True:
+                D_sub_list = []
+                ratios = []
+                r_p = 0.
+                for j in range(3):
+                    ratios.append(np.random.rand()*(1-r_p)+r_p)
+                    D_sub_list.append(int((ratios[-1]-r_p)*4*N_train))
+                    r_p = ratios[-1]
+                D_sub_list.append(4*N_train - np.sum(D_sub_list))
+                if (np.array(D_sub_list)!=0).all():
+                    D_list.extend([a+N-N_train for a in D_sub_list])
+                    break
+
+        cov = k.K(x_raw)
+
+        k_r = GPy.kern.RBF(2,lengthscale=.4)
+        x_r = np.random.rand(D,2)
+        cov_r = k_r.K(x_r)
+
+        cov_all = np.repeat(np.repeat(cov_r,D_list,axis=0),D_list,axis=1)*cov
+        L = GPy.util.linalg.jitchol(cov_all)
+
+        y_latent = L.dot(np.random.randn(N*D))
+
+        x = np.zeros((D*N_train,))
+        y = np.zeros((D*N_train,))
+        x_test = np.zeros((D*(N-N_train),))
+        y_test = np.zeros((D*(N-N_train),))
+        indexD = np.zeros((D*N_train),dtype=np.int)
+        indexD_test = np.zeros((D*(N-N_train)),dtype=np.int)
+
+        offset_all = 0
+        offset_train = 0
+        offset_test = 0
+        for i in range(D):
+            D_test = N-N_train
+            D_train = D_list[i] - N+N_train
+            y[offset_train:offset_train+D_train] = y_latent[offset_all:offset_all+D_train]
+            x[offset_train:offset_train+D_train] = x_raw[offset_all:offset_all+D_train,0]
+            y_test[offset_test:offset_test+D_test] = y_latent[offset_all+D_train:offset_all+D_train+D_test]
+            x_test[offset_test:offset_test+D_test] = x_raw[offset_all+D_train:offset_all+D_train+D_test,0]
+            indexD[offset_train:offset_train+D_train] = i
+            indexD_test[offset_test:offset_test+D_test] = i
+            offset_train += D_train
+            offset_test += D_test
+            offset_all += D_train+D_test
+
+        y_noisefree = y.copy()
+        y += np.random.randn(*y.shape)*np.sqrt(noise_var)
+        x_flat = x.flatten()[:,None]
+        y_flat = y.flatten()[:,None]
+
+        Mr, Mc, Qr, Qc = 4,3,2,1
+
+        m = GPy.models.GPMultioutRegressionMD(x_flat,y_flat,indexD,Xr_dim=Qr, kernel_row=GPy.kern.RBF(Qr,ARD=False), num_inducing=(Mc,Mr))
+        m.optimize_auto(max_iters=1)
+        m.randomize()
+        self.assertTrue(m.checkgrad())
+
+        m = GPy.models.GPMultioutRegressionMD(x_flat,y_flat,indexD,Xr_dim=Qr, kernel_row=GPy.kern.RBF(Qr,ARD=False), num_inducing=(Mc,Mr),init='rand')
+        m.optimize_auto(max_iters=1)
+        m.randomize()
+        self.assertTrue(m.checkgrad())
+
+    def test_posterior_covariance(self):
+        k = GPy.kern.Poly(2, order=1)
+        X1 = np.array([
+                 [-2, 2],
+                 [-1, 1]
+             ])
+        X2 = np.array([
+                 [2, 3],
+                 [-1, 3]
+             ])
+        Y = np.array([[1], [2]])
+        m = GPy.models.GPRegression(X1, Y, kernel=k)
+
+        result = m.posterior_covariance_between_points(X1, X2)
+        expected = np.array([[0.4, 2.2], [1.0, 1.0]]) / 3.0
+
+        self.assertTrue(np.allclose(result, expected))
+
+    def test_posterior_covariance_missing_data(self):
+        Q = 4
+        k = GPy.kern.Linear(Q, ARD=True)
+        m = _create_missing_data_model(k, Q)
+
+        with self.assertRaises(RuntimeError):
+            m.posterior_covariance_between_points(np.array([[1], [2]]), np.array([[3], [4]]))
+
+def _create_missing_data_model(kernel, Q):
+    D1, D2, D3, N, num_inducing = 13, 5, 8, 400, 3
+    _, _, Ylist = GPy.examples.dimensionality_reduction._simulate_matern(D1, D2, D3, N, num_inducing, False)
+    Y = Ylist[0]
+
+    inan = np.random.binomial(1, .9, size=Y.shape).astype(bool) # 80% missing data
+    Ymissing = Y.copy()
+    Ymissing[inan] = np.nan
+
+    m = GPy.models.bayesian_gplvm_minibatch.BayesianGPLVMMiniBatch(Ymissing, Q, init="random", num_inducing=num_inducing,
+                      kernel=kernel, missing_data=True)
+
+    return m
 
 if __name__ == "__main__":
     print("Running unit tests, please be (very) patient...")

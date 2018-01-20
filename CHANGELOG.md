@@ -1,5 +1,378 @@
 # Changelog
 
+## v1.8.5 (2017-12-01)
+
+### New Features
+
+* Implement [Latent Variable Multiple Output Gaussian Processes (LVMOGP)](https://arxiv.org/abs/1705.09862) [Zhenwen Dai]
+
+* Add mean function functionality to dtc inference method [Mark Pullin]
+
+* Allow non-zero mean GP prior for EP [Pablo Moreno]
+
+### Fix
+
+* Fix DSYR function interface (to support SciPy 1.0) [Pablo Moreno]
+
+* Fix scipy=1.0.0 incompatibility of lyapunov [Alan Saul]
+
+* Fix tests for Matplotlib plotting issue [Alan Saul]
+
+## v1.8.4 (2017-10-06)
+
+### Other
+
+* Bump version: 1.8.3 → 1.8.4. [mzwiessele]
+
+* Update appveyor.yml. [Max Zwiessele]
+
+* Merge branch &#x27;devel&#x27; of github.com:SheffieldML/GPy into devel. [mzwiessele]
+
+* Merge branch &#x27;deploy&#x27; into devel. [Max Zwiessele]
+
+* Merge pull request #557 from SheffieldML/devel. [Max Zwiessele]
+
+  Paramz 0.8 update
+
+* Merge pull request #544 from SheffieldML/devel. [Zhenwen Dai]
+
+  Release GPy 1.8.x
+
+
+## v1.8.3 (2017-10-02)
+
+### Fix
+
+* Uniform prior instantiation. [mzwiessele]
+
+* Use paramz 0.8.5. [mzwiessele]
+
+### Other
+
+* Bump version: 1.8.2 → 1.8.3. [mzwiessele]
+
+
+## v1.8.2 (2017-10-02)
+
+### Fix
+
+* Uniform prior tests. [mzwiessele]
+
+* Uniform prior can be positive and negative, depending on lower and upper bound. [mzwiessele]
+
+### Other
+
+* Bump version: 1.8.1 → 1.8.2. [mzwiessele]
+
+
+## v1.8.1 (2017-10-02)
+
+### Fix
+
+* Paramz 0.8. [mzwiessele]
+
+* Creating new kernel was missing active dims. [mzwiessele]
+
+* Naming of ard contribution in ARD plot. [Max Zwiessele]
+
+* Replacing np.power with np.square for efficiency. [Chris Tomaszewski]
+
+* Slight modification to MLP mapping to reduce potential for numpy overflows and unnecessary computation. [Chris Tomaszewski]
+
+### Other
+
+* Bump version: 1.8.0 → 1.8.1. [mzwiessele]
+
+* Paramz 0.8. [Max Zwiessele]
+
+* Paramz 0.8. [Max Zwiessele]
+
+* Merge pull request #549 from christomaszewski/devel. [Zhenwen Dai]
+
+  fix: slight modification to MLP mapping to reduce potential for numpy…
+
+* Merge pull request #545 from pgmoren/devel. [Zhenwen Dai]
+
+  Thanks Pablo for the changes about Basic framework for serializing GPy models. I think we need the corresponding docstrings as developer documentation.
+
+* Basic framework for serializing GPy models. [Moreno]
+
+* Merge pull request #543 from icdishb/devel. [Zhenwen Dai]
+
+  Merged in the changes about Input warping using Kumar warping.
+
+  Thanks for the contribution, Huibin!
+
+* Input warping using Kumar warping. [Shen]
+
+* Merge branch &#x27;deploy&#x27; into devel. [Max Zwiessele]
+
+* Merge branch &#x27;devel&#x27; into deploy. [mzwiessele]
+
+* Merge branch &#x27;devel&#x27; into deploy. [mzwiessele]
+
+* Merge branch &#x27;deploy&#x27; of github.com:SheffieldML/GPy into deploy. [mzwiessele]
+
+* Merge pull request #497 from SheffieldML/devel. [Max Zwiessele]
+
+  New fixes for parallel optimize and minor fixes
+
+
+## v1.8.0 (2017-09-11)
+
+### Fix
+
+* Updated keywords. [mzwiessele]
+
+* Beiwang will add GMM in full. [mzwiessele]
+
+* Kernel tests and variational tests. [mzwiessele]
+
+* Plotting tests for new matplotlib. [mzwiessele]
+
+* Model tests numpy integer error. [mzwiessele]
+
+* Replot with new matplotlib. [mzwiessele]
+
+* Offline plotting workaround with squeezing arrays. [mzwiessele]
+
+* Fixed numpy 1.12 indexing and shape preservation. [mzwiessele]
+
+### Other
+
+* Bump version: 1.7.7 → 1.8.0. [mzwiessele]
+
+* Merge pull request #527 from adhaka/ll-surv. [Zhenwen Dai]
+
+  merged in the changes about Ll surv
+
+* Merging with the main devel branch. [Akash Kumar Dhaka]
+
+* Correcting weibull- changing parameterisation from f to exp(f) similar to loglogistic. [Akash Kumar Dhaka]
+
+* Change import statements for calling locally. [Akash Kumar Dhaka]
+
+* Fresh branch for these new likelihood functions along with test code- will work atleast with La[lace approximation ... [Akash Kumar Dhaka]
+
+* Merge pull request #542 from SheffieldML/EP_refactor. [Zhenwen Dai]
+
+  Merge in the EP refactoring
+
+* Merge pull request #534 from adhaka/EP_refactor. [Zhenwen Dai]
+
+  Ep refactor
+
+* Some more merge conflicts resolved for syncing with the current devel branch of main GPy. [Akash Kumar Dhaka]
+
+* Bug fixes in test cases due to changes in api of ep functions.. [Akash Kumar Dhaka]
+
+* Robustified binomial likelihood. [Siivola Eero]
+
+* Minor bugfix. [Siivola Eero]
+
+* Fixed two small lbugs. [Siivola Eero]
+
+* Putting exact_inference_gradients again and calling in instead from ep_gradients which is the genreic method for calculating expected gradients used in ep. [Akash Kumar Dhaka]
+
+* Commiting code for some changes to api for calculating ep_gradients, also fixing some issues with gaussian hermite quadrature, no we have both avaialable ... [Akash Kumar Dhaka]
+
+* Adding file for gaussian-kronrod integration, test cases and calculating gradients of log marginal wrt theta-likelihood params. [Akash Kumar Dhaka]
+
+* Fixing a typo-bug in the last commit for ep test case. [Akash Kumar Dhaka]
+
+* Merging with the gpy devel branch to be in sync with the latest code and make pull request again .. [Akash Kumar Dhaka]
+
+* Bug fixes in test cases due to changes in api of ep functions.. [Akash Kumar Dhaka]
+
+* Robustified binomial likelihood. [Siivola Eero]
+
+* Minor bugfix. [Siivola Eero]
+
+* Fixed two small lbugs. [Siivola Eero]
+
+* Putting exact_inference_gradients again and calling in instead from ep_gradients which is the genreic method for calculating expected gradients used in ep. [Akash Kumar Dhaka]
+
+* Commiting code for some changes to api for calculating ep_gradients, also fixing some issues with gaussian hermite quadrature, no we have both avaialable ... [Akash Kumar Dhaka]
+
+* Adding file for gaussian-kronrod integration, test cases and calculating gradients of log marginal wrt theta-likelihood params. [Akash Kumar Dhaka]
+
+* Fixing a typo-bug in the last commit for ep test case. [Akash Kumar Dhaka]
+
+* Removing pods dependency and a few print commands. [Akash Kumar Dhaka]
+
+* Bug fix to prevent infinite loop because of incorrect stopping condition. [Akash Kumar Dhaka]
+
+* Adding some test cases for EP.. more work needs to be done, these are some high level test cases .. [Akash Kumar Dhaka]
+
+* Refactor EP and EPDTC. [Moreno]
+
+* Added initial version of the refactored EP. [esiivola]
+
+* Added initial version of the refactored EP. [esiivola]
+
+* Added initial version of the refactored EP. [esiivola]
+
+* Bump version: 1.6.1 → 1.6.2. [mzwiessele]
+
+* Fix in sparse_gp_mpi optimizer. [Alex Feldstein]
+
+* Fix for parallel optimization. [Alex Feldstein]
+
+* Changes in EP/EPDTC to fix numerical issues and increase the flexibility of the inference. [Moreno]
+
+  Changes to avoid numerical issues and improve the performance:
+      - Keep value of the EP parameters between calls
+      - Enforce positivity of tau_tilde
+      - Stable computation of the EP moments for the Bernoulli likelihood
+      - Compute marginal in the GP model without directly inverting tau_tilde
+
+      Changes to improve the flexibility:
+      - Add parameter for maximum number of iterations
+      - Distinguish between alternated/nested mode
+      - Distinguish between sequential/parallel updates in EP
+
+* Cython in linalg. [Max Zwiessele]
+
+  did set cython to working if linalg_cython was importable.
+
+* Bump version: 1.6.0 → 1.6.1. [mzwiessele]
+
+* Bump version: 1.5.9 → 1.6.0. [mzwiessele]
+
+* Provide two classes for plotly plots to remove global variable. [Alex Feldstein]
+
+* Bump version: 1.5.8 → 1.5.9. [mzwiessele]
+
+* Bump version: 1.5.7 → 1.5.8. [mzwiessele]
+
+* Add offline plotting for plotly. [Alex Feldstein]
+
+* Merge pull request #513 from adhaka/EP_refactor. [Zhenwen Dai]
+
+  adding some test cases for EP.. more work needs to be done, these are…
+
+* Removing pods dependency and a few print commands. [Akash Kumar Dhaka]
+
+* Bug fix to prevent infinite loop because of incorrect stopping condition. [Akash Kumar Dhaka]
+
+* Adding some test cases for EP.. more work needs to be done, these are some high level test cases .. [Akash Kumar Dhaka]
+
+* Merge pull request #512 from pgmoren/EP_refactor. [Zhenwen Dai]
+
+  Refactor EP/EPDTC
+
+* Refactor EP and EPDTC. [Moreno]
+
+* Merge pull request #508 from esiivola/EP_refactor. [Zhenwen Dai]
+
+  Bring the ongoing working about EP refactoring
+
+* Added initial version of the refactored EP. [esiivola]
+
+* Added initial version of the refactored EP. [esiivola]
+
+* Added initial version of the refactored EP. [esiivola]
+
+
+## v1.7.7 (2017-06-19)
+
+### Other
+
+* Bump version: 1.7.6 → 1.7.7. [mzwiessele]
+
+
+## v1.7.6 (2017-06-19)
+
+### Fix
+
+* Appveyor not uploading to testpypi for now. [mzwiessele]
+
+### Other
+
+* Bump version: 1.7.5 → 1.7.6. [mzwiessele]
+
+
+## v1.7.5 (2017-06-19)
+
+### Fix
+
+* Splitting forecast tests into 3 to circumvent 10 minute stop of travis. [mzwiessele]
+
+### Other
+
+* Bump version: 1.7.4 → 1.7.5. [mzwiessele]
+
+
+## v1.7.4 (2017-06-19)
+
+### Fix
+
+* Paramz version for parallel optimization fix. [mzwiessele]
+
+### Other
+
+* Bump version: 1.7.3 → 1.7.4. [mzwiessele]
+
+
+## v1.7.3 (2017-06-19)
+
+### Fix
+
+* Appveyor build failing. [mzwiessele]
+
+### Other
+
+* Bump version: 1.7.2 → 1.7.3. [mzwiessele]
+
+
+## v1.7.2 (2017-06-17)
+
+### Fix
+
+* Appveyor build python 3.6. [mzwiessele]
+
+### Other
+
+* Bump version: 1.7.1 → 1.7.2. [mzwiessele]
+
+
+## v1.7.1 (2017-06-17)
+
+### Fix
+
+* Appveyor build python 3.6. [mzwiessele]
+
+### Other
+
+* Bump version: 1.7.0 → 1.7.1. [mzwiessele]
+
+
+## v1.7.0 (2017-06-17)
+
+### Fix
+
+* Support for 3.5 and higher now that 3.6 is out. [mzwiessele]
+
+### Other
+
+* Bump version: 1.6.3 → 1.7.0. [mzwiessele]
+
+
+## v1.6.3 (2017-06-17)
+
+### Other
+
+* Bump version: 1.6.2 → 1.6.3. [mzwiessele]
+
+* Merge pull request #504 from rmcantin/devel. [Max Zwiessele]
+
+* Fix python 2-3 compatibility. [Ruben Martinez-Cantin]
+
+* Merge pull request #511 from dirmeier/devel. [Max Zwiessele]
+
+* Added LICENSE file to MANIFEST.in. [dirmeier]
+
+
 ## v1.6.2 (2017-04-12)
 
 ### Fix

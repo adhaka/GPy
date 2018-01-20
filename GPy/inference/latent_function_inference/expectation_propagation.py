@@ -7,6 +7,9 @@ from . import ExactGaussianInference, VarDTC
 from ...util import diag, quad_integrate
 from .posterior import PosteriorEP as Posterior
 from functools import partial
+from ...likelihoods import Gaussian
+from . import LatentFunctionInference
+
 
 log_2_pi = np.log(2*np.pi)
 
@@ -98,6 +101,14 @@ class cavityParams(object):
     def _update_i(self, eta, ga_approx, post_params, i):
         self.tau[i] = 1./post_params.Sigma_diag[i] - eta*ga_approx.tau[i]
         self.v[i] = post_params.mu[i]/post_params.Sigma_diag[i] - eta*ga_approx.v[i]
+    def to_dict(self):
+        return {"tau": self.tau.tolist(), "v": self.v.tolist()}
+    @staticmethod
+    def from_dict(input_dict):
+        c = cavityParams(len(input_dict["tau"]))
+        c.tau = np.array(input_dict["tau"])
+        c.v = np.array(input_dict["v"])
+        return c
 
 
 class gaussianApproximation(object):
@@ -117,9 +128,15 @@ class gaussianApproximation(object):
         if self.tau[i] < np.finfo(float).eps:
             self.tau[i] = np.finfo(float).eps
             delta_tau = self.tau[i] - tau_tilde_prev
+
         self.v[i] += delta_v
 
         return (delta_tau, delta_v)
+    def to_dict(self):
+        return {"tau": self.tau.tolist(), "v": self.v.tolist()}
+    @staticmethod
+    def from_dict(input_dict):
+        return gaussianApproximation(np.array(input_dict["v"]), np.array(input_dict["tau"]))
 
 
 class posteriorParamsBase(object):
@@ -139,13 +156,28 @@ class posteriorParams(posteriorParamsBase):
         Sigma_diag = np.diag(self.Sigma)
         super(posteriorParams, self).__init__(mu, Sigma_diag)
 
-    def _update_rank1(self, delta_tau, ga_approx, i):
-        ci = delta_tau/(1.+ delta_tau*self.Sigma_diag[i])
-        DSYR(self.Sigma, self.Sigma[:,i].copy(), -ci)
-        self.mu = np.dot(self.Sigma, ga_approx.v)
+    def _update_rank1(self, delta_tau, delta_v, ga_approx, i):
+        si = self.Sigma[i,:].copy()
+        ci = delta_tau/(1.+ delta_tau*si[i])
+        self.mu = self.mu - (ci*(self.mu[i]+si[i]*delta_v)-delta_v) * si
+        DSYR(self.Sigma, si, -ci)
+
+    def to_dict(self):
+        #TODO: Implement a more memory efficient variant
+        if self.L is None:
+            return { "mu": self.mu.tolist(), "Sigma": self.Sigma.tolist()}
+        else:
+            return { "mu": self.mu.tolist(), "Sigma": self.Sigma.tolist(), "L": self.L.tolist()}
 
     @staticmethod
-    def _recompute(K, ga_approx):
+    def from_dict(input_dict):
+        if "L" in input_dict:
+            return posteriorParams(np.array(input_dict["mu"]), np.array(input_dict["Sigma"]), np.array(input_dict["L"]))
+        else:
+            return posteriorParams(np.array(input_dict["mu"]), np.array(input_dict["Sigma"]))
+
+    @staticmethod
+    def _recompute(mean_prior, K, ga_approx):
         num_data = len(ga_approx.tau)
         tau_tilde_root = np.sqrt(ga_approx.tau)
         Sroot_tilde_K = tau_tilde_root[:,None] * K
@@ -153,7 +185,11 @@ class posteriorParams(posteriorParamsBase):
         L = jitchol(B)
         V, _ = dtrtrs(L, Sroot_tilde_K, lower=1)
         Sigma = K - np.dot(V.T,V) #K - KS^(1/2)BS^(1/2)K = (K^(-1) + \Sigma^(-1))^(-1)
-        mu = np.dot(Sigma,ga_approx.v)
+
+        aux_alpha , _ = dpotrs(L, tau_tilde_root * (np.dot(K, ga_approx.v) + mean_prior), lower=1)
+        alpha = ga_approx.v - tau_tilde_root * aux_alpha #(K + Sigma^(\tilde))^(-1) (/mu^(/tilde) - /mu_p)
+        mu = np.dot(K, alpha) + mean_prior
+
         return posteriorParams(mu=mu, Sigma=Sigma, L=L)
 
 class posteriorParamsDTC(posteriorParamsBase):
@@ -184,7 +220,7 @@ class posteriorParamsDTC(posteriorParamsBase):
         return posteriorParamsDTC(mu, Sigma_diag), LLT
 
 class EPBase(object):
-    def __init__(self, epsilon=1e-6, eta=1., delta=1., always_reset=False, max_iters=np.inf, ep_mode="alternated", parallel_updates=False):
+    def __init__(self, epsilon=1e-6, eta=1., delta=1., always_reset=False, max_iters=np.inf, ep_mode="alternated", parallel_updates=False, loading=False):
         """
         The expectation-propagation algorithm.
         For nomenclature see Rasmussen & Williams 2006.
@@ -200,6 +236,7 @@ class EPBase(object):
         :max_iters: int
         :ep_mode: string. It can be "nested" (EP is run every time the Hyperparameters change) or "alternated" (It runs EP at the beginning and then optimize the Hyperparameters).
         :parallel_updates: boolean. If true, updates of the parameters of the sites in parallel
+        :loading: boolean. If True, prevents the EP parameters to change. Hack used when loading a serialized model
         """
         super(EPBase, self).__init__()
 
@@ -207,6 +244,8 @@ class EPBase(object):
         self.epsilon, self.eta, self.delta, self.max_iters = epsilon, eta, delta, max_iters
         self.ep_mode = ep_mode
         self.parallel_updates = parallel_updates
+        #FIXME: Hack for serialiation. If True, prevents the EP parameters to change when loading a serialized model
+        self.loading = loading
         self.reset()
 
     def reset(self):
@@ -233,34 +272,53 @@ class EPBase(object):
     def __getstate__(self):
         return [super(EPBase, self).__getstate__() , [self.epsilon, self.eta, self.delta]]
 
+    def _to_dict(self):
+        input_dict = super(EPBase, self)._to_dict()
+        input_dict["epsilon"]=self.epsilon
+        input_dict["eta"]=self.eta
+        input_dict["delta"]=self.delta
+        input_dict["always_reset"]=self.always_reset
+        input_dict["max_iters"]=self.max_iters
+        input_dict["ep_mode"]=self.ep_mode
+        input_dict["parallel_updates"]=self.parallel_updates
+        input_dict["loading"]=True
+        return input_dict
+
 class EP(EPBase, ExactGaussianInference):
     def inference(self, kern, X, likelihood, Y, mean_function=None, Y_metadata=None, precision=None, K=None):
-        if self.always_reset:
+        if self.always_reset and not self.loading:
             self.reset()
 
         num_data, output_dim = Y.shape
         assert output_dim == 1, "ep in 1D only (for now!)"
 
+        if mean_function is None:
+            mean_prior = np.zeros(X.shape[0])
+        else:
+            mean_prior = mean_function.f(X).flatten()
+
         if K is None:
             K = kern.K(X)
 
-        if self.ep_mode=="nested":
+        if self.ep_mode=="nested" and not self.loading:
             #Force EP at each step of the optimization
             self._ep_approximation = None
-            post_params, ga_approx, log_Z_tilde = self._ep_approximation = self.expectation_propagation(K, Y, likelihood, Y_metadata)
-        elif self.ep_mode=="alternated":
+            post_params, ga_approx, cav_params, log_Z_tilde = self._ep_approximation = self.expectation_propagation(mean_prior, K, Y, likelihood, Y_metadata)
+        elif self.ep_mode=="alternated" or self.loading:
             if getattr(self, '_ep_approximation', None) is None:
                 #if we don't yet have the results of runnign EP, run EP and store the computed factors in self._ep_approximation
-                post_params, ga_approx, log_Z_tilde = self._ep_approximation = self.expectation_propagation(K, Y, likelihood, Y_metadata)
+                post_params, ga_approx, cav_params, log_Z_tilde = self._ep_approximation = self.expectation_propagation(mean_prior, K, Y, likelihood, Y_metadata)
             else:
                 #if we've already run EP, just use the existing approximation stored in self._ep_approximation
-                post_params, ga_approx, log_Z_tilde = self._ep_approximation
+                post_params, ga_approx, cav_params, log_Z_tilde = self._ep_approximation
         else:
             raise ValueError("ep_mode value not valid")
 
-        return self._inference(K, ga_approx, likelihood, Y_metadata=Y_metadata,  Z_tilde=log_Z_tilde)
+        self.loading = False
 
-    def expectation_propagation(self, K, Y, likelihood, Y_metadata):
+        return self._inference(Y, mean_prior, K, ga_approx, cav_params, likelihood, Y_metadata=Y_metadata,  Z_tilde=log_Z_tilde)
+
+    def expectation_propagation(self, mean_prior, K, Y, likelihood, Y_metadata):
 
         num_data, data_dim = Y.shape
         assert data_dim == 1, "This EP methods only works for 1D outputs"
@@ -272,7 +330,7 @@ class EP(EPBase, ExactGaussianInference):
         #Initial values - Marginal moments, cavity params, gaussian approximation params and posterior params
         marg_moments = marginalMoments(num_data)
         cav_params = cavityParams(num_data)
-        ga_approx, post_params = self._init_approximations(K, num_data)
+        ga_approx, post_params = self._init_approximations(mean_prior, K, num_data)
 
         #Approximation
         stop = False
@@ -281,7 +339,7 @@ class EP(EPBase, ExactGaussianInference):
             self._local_updates(num_data, cav_params, post_params, marg_moments, ga_approx, likelihood, Y, Y_metadata)
 
             #(re) compute Sigma and mu using full Cholesky decompy
-            post_params = posteriorParams._recompute(K, ga_approx)
+            post_params = posteriorParams._recompute(mean_prior, K, ga_approx)
 
             #monitor convergence
             if iterations > 0:
@@ -289,13 +347,11 @@ class EP(EPBase, ExactGaussianInference):
             self.ga_approx_old = gaussianApproximation(ga_approx.v.copy(), ga_approx.tau.copy())
             iterations += 1
 
-        # Z_tilde after removing the terms that can lead to infinite terms due to tau_tilde close to zero.
-        # This terms cancel with the coreresponding terms in the marginal loglikelihood
         log_Z_tilde = self._log_Z_tilde(marg_moments, ga_approx, cav_params)
-                         # - 0.5*np.log(tau_tilde) + 0.5*(v_tilde*v_tilde*1./tau_tilde)
-        return (post_params, ga_approx, log_Z_tilde)
 
-    def _init_approximations(self, K, num_data):
+        return (post_params, ga_approx, cav_params, log_Z_tilde)
+
+    def _init_approximations(self, mean_prior, K, num_data):
         #initial values - Gaussian factors
         #Initial values - Posterior distribution parameters: q(f|X,Y) = N(f|mu,Sigma)
         if self.ga_approx_old is None:
@@ -303,12 +359,12 @@ class EP(EPBase, ExactGaussianInference):
             ga_approx = gaussianApproximation(v_tilde, tau_tilde)
             Sigma = K.copy()
             diag.add(Sigma, 1e-7)
-            mu = np.zeros(num_data)
+            mu = mean_prior
             post_params = posteriorParams(mu, Sigma)
         else:
             assert self.ga_approx_old.v.size == num_data, "data size mis-match: did you change the data? try resetting!"
             ga_approx = gaussianApproximation(self.ga_approx_old.v, self.ga_approx_old.tau)
-            post_params = posteriorParams._recompute(K, ga_approx)
+            post_params = posteriorParams._recompute(mean_prior, K, ga_approx)
             diag.add(post_params.Sigma, 1e-7)
             # TODO: Check the log-marginal under both conditions and choose the best one
         return (ga_approx, post_params)
@@ -334,42 +390,82 @@ class EP(EPBase, ExactGaussianInference):
                 delta_tau, delta_v = ga_approx._update_i(self.eta, self.delta, post_params, marg_moments, i)
 
                 if self.parallel_updates == False:
-                    post_params._update_rank1(delta_tau, ga_approx, i)
+                    post_params._update_rank1(delta_tau, delta_v, ga_approx, i)
 
     def _log_Z_tilde(self, marg_moments, ga_approx, cav_params):
-        return np.sum((np.log(marg_moments.Z_hat) + 0.5*np.log(2*np.pi) + 0.5*np.log(1+ga_approx.tau/cav_params.tau) - 0.5 * ((ga_approx.v)**2 * 1./(cav_params.tau + ga_approx.tau))
-                + 0.5*(cav_params.v * ( ( (ga_approx.tau/cav_params.tau) * cav_params.v - 2.0 * ga_approx.v ) * 1./(cav_params.tau + ga_approx.tau)))))
+        # Z_tilde after removing the terms that can lead to infinite terms due to tau_tilde close to zero.
+        # This terms cancel with the coreresponding terms in the marginal loglikelihood
+        return np.sum((
+                np.log(marg_moments.Z_hat)
+                + 0.5*np.log(2*np.pi) + 0.5*np.log(1+ga_approx.tau/cav_params.tau)
+                - 0.5 * ((ga_approx.v)**2 * 1./(cav_params.tau + ga_approx.tau))
+                + 0.5*(cav_params.v * ( ( (ga_approx.tau/cav_params.tau) * cav_params.v - 2.0 * ga_approx.v ) * 1./(cav_params.tau + ga_approx.tau)))
+                ))
 
-
-
-    def _ep_marginal(self, K, ga_approx, Z_tilde):
-        post_params = posteriorParams._recompute(K, ga_approx)
-
+    def _ep_marginal(self, mean_prior, K, ga_approx, Z_tilde):
+        post_params = posteriorParams._recompute(mean_prior, K, ga_approx)
         # Gaussian log marginal excluding terms that can go to infinity due to arbitrarily small tau_tilde.
         # These terms cancel out with the terms excluded from Z_tilde
         B_logdet = np.sum(2.0*np.log(np.diag(post_params.L)))
-        log_marginal =  0.5*(-len(ga_approx.tau) * log_2_pi - B_logdet + np.sum(ga_approx.v * np.dot(post_params.Sigma,ga_approx.v)))
+        S_mean_prior = ga_approx.tau * mean_prior
+        v_centered = ga_approx.v - S_mean_prior
+        log_marginal =  0.5*(
+                        -len(ga_approx.tau) * log_2_pi - B_logdet
+                        + np.sum(v_centered * np.dot(post_params.Sigma, v_centered))
+                        - np.dot(mean_prior, (S_mean_prior - 2*ga_approx.v))
+                        )
         log_marginal += Z_tilde
 
         return log_marginal, post_params
 
-    def _inference(self, K, ga_approx, likelihood, Z_tilde, Y_metadata=None):
-        log_marginal, post_params = self._ep_marginal(K, ga_approx, Z_tilde)
+    def _inference(self, Y, mean_prior, K, ga_approx, cav_params, likelihood, Z_tilde, Y_metadata=None):
+        log_marginal, post_params = self._ep_marginal(mean_prior, K, ga_approx, Z_tilde)
 
         tau_tilde_root = np.sqrt(ga_approx.tau)
         Sroot_tilde_K = tau_tilde_root[:,None] * K
 
-        aux_alpha , _ = dpotrs(post_params.L, np.dot(Sroot_tilde_K, ga_approx.v), lower=1)
-        alpha = (ga_approx.v - tau_tilde_root * aux_alpha)[:,None] #(K + Sigma^(\tilde))^(-1) /mu^(/tilde)
+
+        aux_alpha , _ = dpotrs(post_params.L, tau_tilde_root * (np.dot(K, ga_approx.v) +  mean_prior), lower=1)
+        alpha = (ga_approx.v - tau_tilde_root * aux_alpha)[:,None] #(K + Sigma^(\tilde))^(-1) (/mu^(/tilde) -  /mu_p)
+
         LWi, _ = dtrtrs(post_params.L, np.diag(tau_tilde_root), lower=1)
         Wi = np.dot(LWi.T,LWi)
         symmetrify(Wi) #(K + Sigma^(\tilde))^(-1)
 
         dL_dK = 0.5 * (tdot(alpha) - Wi)
-        dL_dthetaL = likelihood.exact_inference_gradients(np.diag(dL_dK), Y_metadata)
-
+        dL_dthetaL = likelihood.ep_gradients(Y, cav_params.tau, cav_params.v, np.diag(dL_dK), Y_metadata=Y_metadata, quad_mode='gh')
         return Posterior(woodbury_inv=Wi, woodbury_vector=alpha, K=K), log_marginal, {'dL_dK':dL_dK, 'dL_dthetaL':dL_dthetaL, 'dL_dm':alpha}
 
+    def to_dict(self):
+        input_dict = super(EP, self)._to_dict()
+        input_dict["class"] = "GPy.inference.latent_function_inference.expectation_propagation.EP"
+        if self.ga_approx_old is not  None:
+            input_dict["ga_approx_old"] = self.ga_approx_old.to_dict()
+        if self._ep_approximation is not  None:
+            input_dict["_ep_approximation"] = {}
+            input_dict["_ep_approximation"]["post_params"] = self._ep_approximation[0].to_dict()
+            input_dict["_ep_approximation"]["ga_approx"] = self._ep_approximation[1].to_dict()
+            input_dict["_ep_approximation"]["cav_params"] = self._ep_approximation[2].to_dict()
+            input_dict["_ep_approximation"]["log_Z_tilde"] = self._ep_approximation[3].tolist()
+
+        return input_dict
+
+    @staticmethod
+    def _from_dict(inference_class, input_dict):
+        ga_approx_old = input_dict.pop('ga_approx_old', None)
+        if ga_approx_old is not None:
+            ga_approx_old = gaussianApproximation.from_dict(ga_approx_old)
+        _ep_approximation_dict = input_dict.pop('_ep_approximation', None)
+        _ep_approximation = []
+        if _ep_approximation is not None:
+            _ep_approximation.append(posteriorParams.from_dict(_ep_approximation_dict["post_params"]))
+            _ep_approximation.append(gaussianApproximation.from_dict(_ep_approximation_dict["ga_approx"]))
+            _ep_approximation.append(cavityParams.from_dict(_ep_approximation_dict["cav_params"]))
+            _ep_approximation.append(np.array(_ep_approximation_dict["log_Z_tilde"]))
+        ee = EP(**input_dict)
+        ee.ga_approx_old = ga_approx_old
+        ee._ep_approximation = _ep_approximation
+        return ee
 
 class EPDTC(EPBase, VarDTC):
     def inference(self, kern, X, Z, likelihood, Y, mean_function=None, Y_metadata=None, Lm=None, dL_dKmm=None, psi0=None, psi1=None, psi2=None):
